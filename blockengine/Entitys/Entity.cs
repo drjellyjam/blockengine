@@ -21,6 +21,7 @@ namespace blockengine.Entitys
             Position = _position;
         }
 
+        public abstract void DrawGui();
         public abstract void Draw();
         public abstract void Tick();
         public abstract void Start();
