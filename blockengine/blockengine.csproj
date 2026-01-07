@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Assets\**" />
+    <EmbeddedResource Remove="Assets\**" />
+    <None Remove="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Raylib-cs">
+      <HintPath>..\..\..\..\Documents\raylib-5.0_win64_msvc16\raylib-cs-master\Raylib-cs\bin\Debug\net6.0\Raylib-cs.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
