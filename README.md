@@ -6,7 +6,7 @@ features:
 
 . Infinite chunks
 
-. multiple blocks
+. multiple blocks (system needs revamp)
 
 . runtime texture atlas generation from seperate texture files (bad)
 
