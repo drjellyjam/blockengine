@@ -129,7 +129,7 @@ namespace blockengine
             return null;
         }
 
-        private void AddChunk(Int3 pos)
+        public void AddChunk(Int3 pos)
         {
             string id = GetChunkID(pos);
             if (!chunks.ContainsKey(id))
@@ -196,7 +196,7 @@ namespace blockengine
                     byte[] bytes = File.ReadAllBytes(chunk_file_path);
                     for (int i = 0; i < chunk.map.fullsize; i++)
                     {
-                        chunk.map.Set(chunk.map.IndexToPosition(i), (int)bytes[i]);
+                        chunk.map.Set(chunk.map.IndexToPosition(i), "GREY_STONE");
                     }
                     //Console.WriteLine("");
                     Console.WriteLine("Loaded chunk: " + chunk_file_path);
@@ -251,7 +251,7 @@ namespace blockengine
              return Vector3Distance(chunk1.to_vector3(), chunk2.to_vector3());
         }
 
-        public int GetBlock(Int3 world_block_pos)
+        public Block? GetBlock(Int3 world_block_pos)
         {
             Int3 chunk_pos = GetChunkPosWorldPos(world_block_pos);
             Chunk chunk = GetChunk(chunk_pos);
@@ -260,9 +260,9 @@ namespace blockengine
                 Int3 chunk_block_pos = GetChunkBlockPosWorldPos(world_block_pos);
                 return chunk.map.Get(chunk_block_pos);
             }
-            return -1;
+            return null;
         }
-        public void SetBlock(Int3 world_block_pos,int setto,bool build_chunks = true)
+        public void SetBlock(Int3 world_block_pos,string setto,bool build_chunks = true)
         {
             Int3 chunk_pos = GetChunkPosWorldPos(world_block_pos);
             Chunk chunk = GetChunk(chunk_pos);
@@ -323,13 +323,9 @@ namespace blockengine
             }
         }
 
-        public bool GetBlockExists(int block)
+        public bool GetBlockExists(string block_def)
         {
-            if (block == -1)
-            {
-                return false;
-            }
-            BlockDefinition? bd = Globals.BlockDefinitions[block];
+            BlockDefinition? bd = Globals.BlockDefinitions[block_def];
             if (bd != null)
             {
                 return bd.Exists;
@@ -339,13 +335,18 @@ namespace blockengine
 
         public BoxCollider GetBlockCollider(Int3 world_block_pos)
         {
-            BlockDefinition? blockdef = Globals.BlockDefinitions[GetBlock(world_block_pos)];
-            if (blockdef != null)
+            var _block = GetBlock(world_block_pos);
+            if (_block != null)
             {
-                BoxCollider c = blockdef.Collider;
-                c.Position = world_block_pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f);
-                return c;
+                BlockDefinition? blockdef = Globals.BlockDefinitions[_block.definition_ID];
+                if (blockdef != null)
+                {
+                    BoxCollider c = blockdef.Collider;
+                    c.Position = world_block_pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f);
+                    return c;
+                }
             }
+            
             return new BoxCollider(world_block_pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f,-0.5f,-0.5f),new Vector3(0.5f,0.5f,0.5f));
         }
 
@@ -405,7 +406,7 @@ namespace blockengine
 
             bool TileFound = false;
             float TraveledDistance = 0;
-            int FoundBlock = -1;
+            Block? FoundBlock = null;
             Vector3 LastMove = Vector3.Zero;
             while (!TileFound && TraveledDistance < MaxTravelDistance)
             {
@@ -442,10 +443,10 @@ namespace blockengine
                 }
                 LastMove = MapCheckBefore - MapCheck;
 
-                int block = GetBlock(new Int3((int)MapCheck.X, (int)MapCheck.Y, (int)MapCheck.Z));
-                if (block > -1)
+                Block? block = GetBlock(new Int3((int)MapCheck.X, (int)MapCheck.Y, (int)MapCheck.Z));
+                if (block != null)
                 {
-                    BlockDefinition? blockdef = Globals.BlockDefinitions[block];
+                    BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
                     if (blockdef != null && blockdef.Exists && !blockdef.NonSolid)
                     {
                         TileFound = true;
@@ -458,7 +459,7 @@ namespace blockengine
                 }
             }
 
-            if (TileFound)
+            if (TileFound && FoundBlock != null)
             {
                 Vector3 Intersection = RayStart + Direction * TraveledDistance;
                 result = new RaycastResult(Intersection, new Int3((int)LastMove.X, (int)LastMove.Y, (int)LastMove.Z), FoundBlock, new Int3((int)MapCheck.X, (int)MapCheck.Y, (int)MapCheck.Z), GetBlockCollider(new Int3((int)MapCheck.X, (int)MapCheck.Y, (int)MapCheck.Z)));
@@ -533,91 +534,100 @@ namespace blockengine
                         Int3 world_block_pos = world_chunk_pos + chunk_block_pos;
                         Vector3 cbp_v = chunk_block_pos.to_vector3();
 
-                        int block = chunk.map.Get(chunk_block_pos);
-                        BlockDefinition? blockdef = Globals.BlockDefinitions[block];
+                        Block? block = chunk.map.Get(chunk_block_pos);
+
+                        if (block == null)
+                        {
+                            return false;
+                        }
+
+                        BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
 
                         if (blockdef != null && blockdef.Exists)
                         {
                             foreach (Int3 normal in Globals.block_normals)
                             {
-                                int atblock = GetBlock(world_block_pos + normal);
+                                Block? atblock = GetBlock(world_block_pos + normal);
                                 
-                                BlockDefinition? atblockdef = Globals.BlockDefinitions[atblock];
-
-                                if (atblockdef != null && (!atblockdef.Exists || atblockdef.Translucent))
+                                if (atblock != null)
                                 {
-                                    bool draw = true;
-                                    if (blockdef.Translucent)
+                                    BlockDefinition? atblockdef = Globals.BlockDefinitions[atblock.definition_ID];
+
+                                    if (!atblockdef.Exists || atblockdef.Translucent)
                                     {
-                                        draw = !(block == atblock);
-                                    }
-                                    if (draw)
-                                    {
-                                        if (normal == Globals.block_normals[5])
+                                        bool draw = true;
+                                        if (blockdef.Translucent)
                                         {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Top);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                            draw = !(block == atblock);
                                         }
-                                        else if (normal == Globals.block_normals[4])
+                                        if (draw)
                                         {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Bottom);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                            if (normal == Globals.block_normals[5])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Top);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
 
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                        }
-                                        else if (normal == Globals.block_normals[2])
-                                        {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Forward);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                            }
+                                            else if (normal == Globals.block_normals[4])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Bottom);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
 
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                        }
-                                        else if (normal == Globals.block_normals[3])
-                                        {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Backward);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                            }
+                                            else if (normal == Globals.block_normals[2])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Forward);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
 
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                        }
-                                        else if (normal == Globals.block_normals[1])
-                                        {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Right);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                            }
+                                            else if (normal == Globals.block_normals[3])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Backward);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
 
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                        }
-                                        else if (normal == Globals.block_normals[0])
-                                        {
-                                            UV bUv = blockdef.GetBlockUV(BlockFace.Left);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                            }
+                                            else if (normal == Globals.block_normals[1])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Right);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
 
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                            }
+                                            else if (normal == Globals.block_normals[0])
+                                            {
+                                                UV bUv = blockdef.GetBlockUV(BlockFace.Left);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                                            }
                                         }
                                     }
                                 }
@@ -844,10 +854,10 @@ namespace blockengine
                     {
                         Int3 blockpos = chunk.map.IndexToPosition(b);
                         Int3 worldpos = (chunkpos * Globals.chunk_size) + blockpos;
-                        
-                        int block = world_generator.GetBlock(worldpos);
 
-                        chunk.map.Set(blockpos, block); //
+                        string block_def_id = world_generator.GetBlock(worldpos);
+
+                        chunk.map.Set(blockpos, block_def_id); //
                     }
 
                     chunk.status = Chunk.chunk_generation_status.generated;

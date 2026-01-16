@@ -31,8 +31,8 @@ namespace blockengine
             (chunkpos * Globals.chunk_size).Print();
             this.chunkpos = chunkpos;
             transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation((chunkpos * Globals.chunk_size).to_vector3()) * Matrix4x4.CreateScale(Globals.BlockScale));
-            map = new Map3D( Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, 0 );
-            map.AddTracker(0);
+            map = new Map3D( Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, "AIR" );
+            map.AddTracker("AIR");
             generator = new ChunkMeshGenerator();
 
             status = chunk_generation_status.ungenerated;
@@ -59,12 +59,12 @@ namespace blockengine
 
         public bool IsAir()
         {
-            return map.GetTrackerValue(0) == map.fullsize;
+            return map.GetTrackerValue("AIR") == map.fullsize;
         }
 
         public bool IsFull()
         {
-            return map.GetTrackerValue(0) == 0;
+            return map.GetTrackerValue("AIR") == 0;
         }
 
         public bool WillBuild()

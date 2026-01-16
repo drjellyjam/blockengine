@@ -77,9 +77,9 @@ namespace blockengine
             carvers.Add(new WorldGen_Carver(amplitude, offset, fnl));
         }
 
-        public int GetBlock(Int3 world_block_pos)
+        public string GetBlock(Int3 world_block_pos)
         {
-            int block = 1; /// the default block
+            string block = "GREY_STONE";  /// the default block
 
             //CARVING STAGE
             ///CARVES HOLES
@@ -88,7 +88,7 @@ namespace blockengine
             {
                 if (carver.Carve(world_block_pos))
                 {
-                    block = 0; //CARVE OUT AIR
+                    block = "AIR";
                 }
             }
 

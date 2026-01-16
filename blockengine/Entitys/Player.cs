@@ -17,7 +17,7 @@ namespace blockengine.Entitys
         public float camlookpitch = 0;
         public BoxCollider collider;
         public World world;
-        int block_to_place = 1;
+        string block_to_place = "BLUE_ORE";
         float gravity = 0.25f;
         public bool noclipping = false;
 
@@ -77,14 +77,17 @@ namespace blockengine.Entitys
                     for (int x = (int)Math.Floor(collider.Min.X - 1); x < (int)Math.Ceiling(collider.Max.X + 1); x++)
                     {
                         Int3 bp = new Int3( (int)topos.X + x, (int)topos.Y + y, (int)topos.Z + z);
-                        int block = world.GetBlock(bp);
-                        BlockDefinition? blockdef = Globals.BlockDefinitions[block];
-                        if (blockdef != null && blockdef.Exists && !blockdef.NonSolid)
+                        Block? block = world.GetBlock(bp);
+                        if (block != null)
                         {
-                            BoxCollider blockcollider = world.GetBlockCollider(bp);
-                            if (collider.CollidingWith(blockcollider))
+                            BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
+                            if (blockdef.Exists && !blockdef.NonSolid)
                             {
-                                return true;
+                                BoxCollider blockcollider = world.GetBlockCollider(bp);
+                                if (collider.CollidingWith(blockcollider))
+                                {
+                                    return true;
+                                }
                             }
                         }
                     }
@@ -206,15 +209,8 @@ namespace blockengine.Entitys
             {
                 scroll = Math.Sign(scroll);
 
-                block_to_place += scroll;
-                if (block_to_place < 1)
-                {
-                    block_to_place = Globals.BlockDefinitions.Count - 2;
-                }
-                if (block_to_place > Globals.BlockDefinitions.Count - 2)
-                {
-                    block_to_place = 1;
-                }
+                //block_to_place += scroll;
+                
                 scroll = 0;
             }
 
@@ -223,7 +219,7 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    world.SetBlock(result.BlockPosition, 0);
+                    world.SetBlock(result.BlockPosition, "AIR");
                 }
             }
 
@@ -232,7 +228,7 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    BlockDefinition? blockplacedefinition = Globals.BlockDefinitions[Math.Max(block_to_place,-1)];
+                    BlockDefinition? blockplacedefinition = Globals.BlockDefinitions[block_to_place];
                     if (blockplacedefinition != null)
                     {
                         BoxCollider placecollider = blockplacedefinition.Collider;

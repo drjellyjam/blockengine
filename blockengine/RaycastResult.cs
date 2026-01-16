@@ -11,10 +11,10 @@ namespace blockengine
     {
         public Vector3 Hit;
         public Int3 Normal;
-        public int Block;
+        public Block Block;
         public Int3 BlockPosition;
         public BoxCollider Collider;
-        public RaycastResult(Vector3 _hit, Int3 _norm, int _block, Int3 _blockpos, BoxCollider _collider) {
+        public RaycastResult(Vector3 _hit, Int3 _norm, Block _block, Int3 _blockpos, BoxCollider _collider) {
             Hit = _hit; 
             Normal = _norm; 
             Block = _block; 

@@ -1,6 +1,7 @@
 ﻿using Raylib_cs;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -56,20 +57,50 @@ namespace blockengine
             BACKWARD = _sides;
         }
     }
+
+    public class Block
+    {
+        public string definition_ID;
+        public float health;
+
+        public Block(string ID = "AIR")
+        {
+            SetDefinition(ID);
+        }
+
+        public void SetDefinition(string ID)
+        {
+            definition_ID = ID;
+
+            var _def = Globals.BlockDefinitions[definition_ID];
+
+            health = _def.durability;
+        }
+
+        public BlockDefinition GetDefinition()
+        {
+            return Globals.BlockDefinitions[definition_ID];
+        }
+    }
+
     public class BlockDefinition
     {
         public string Name;
         public bool Exists;
         public bool NonSolid;
         public bool Translucent;
+        public float durability;
+
         public BoxCollider Collider;
         public BlockFaces FaceTextureIds;
-        public BlockDefinition(string _name,bool _exists = true, bool _nonsolid = false, bool _translucent = false, BlockFaces? _face_texture_ids = null, Vector3? _collider_position = null, Vector3? _collider_min = null, Vector3? _collider_max = null)
+        public BlockDefinition(string _name,bool _exists = true, bool _nonsolid = false, bool _translucent = false, float _durability = 1f, BlockFaces? _face_texture_ids = null, Vector3? _collider_position = null, Vector3? _collider_min = null, Vector3? _collider_max = null)
         {
             Name = _name;
             Exists = _exists;
             NonSolid = _nonsolid;
             Translucent = _translucent;
+            durability = _durability;
+
             if (_face_texture_ids == null)
             {
                 _face_texture_ids = new BlockFaces("Assets/Textures/missing.png");

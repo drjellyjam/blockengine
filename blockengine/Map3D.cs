@@ -9,30 +9,27 @@ namespace blockengine
 {
     public class Map3D
     {
-        int[] map;
+        Block[] map;
         public int width;
         public int height;
         public int depth;
         public int fullsize;
         public bool changed = false; //sets to true when changed.
         
-        Dictionary<int, int> trackers;
+        Dictionary<string, int> trackers;
 
-        public Map3D(int _width, int _height, int _depth, int initial_value = -1)
+        public Map3D(int _width, int _height, int _depth, string initial_value = "AIR")
         {
             width = _width;
             height = _height;
             depth = _depth;
             fullsize = (_width * _height) * _depth;
-            map = new int[fullsize];
-            trackers = new Dictionary<int, int>();
-            if (initial_value > -1)
+            map = new Block[fullsize];
+            trackers = new Dictionary<string, int>();
+
+            for (int i = 0; i < fullsize; i++)
             {
-                for (int i = 0; i<fullsize; i++)
-                {
-                    map[i] = initial_value;
-                }
-                changed = true;
+                map[i] = new Block(initial_value);
             }
         }
 
@@ -42,7 +39,7 @@ namespace blockengine
 
             for (int i = 0; i < fullsize; i++)
             {
-                bytes[i] = (byte)map[i];
+                bytes[i] = (byte)1; //map[i];
             }
 
             return bytes;
@@ -61,14 +58,14 @@ namespace blockengine
             return new Int3(x,y,z);
         }
 
-        public void AddTracker(int block_to_track)
+        public void AddTracker(string block_to_track)
         {
             if (!trackers.ContainsKey(block_to_track))
             {
                 int v = 0;
                 for (int i = 0; i < fullsize; i++)
                 {
-                    if (map[i]== block_to_track)
+                    if (map[i].definition_ID == block_to_track)
                     {
                         v++;
                     }
@@ -77,7 +74,7 @@ namespace blockengine
             }
         }
 
-        public int GetTrackerValue(int being_tracked)
+        public int GetTrackerValue(string being_tracked)
         {
             if (trackers.ContainsKey(being_tracked))
             {
@@ -89,31 +86,31 @@ namespace blockengine
         {
             return (pos.x < 0 || pos.x > width - 1 || pos.y < 0 || pos.y > height - 1 || pos.z < 0 || pos.z > depth - 1);
         }
-        public int Get(Int3 pos)
+        public Block? Get(Int3 pos)
         {
             if (!OutOfBounds(pos))
             {
                 return map[PositionToIndex(pos)];
             }
-            return -1;
+            return null;
         }
-        public void Set(Int3 pos, int setto)
+        public void Set(Int3 pos, string set_definition)
         {
             if (!OutOfBounds(pos))
             {
                 int idx = PositionToIndex(pos);
-                int prev = map[idx];
-                if (trackers.ContainsKey(prev))
+                Block prev = map[idx];
+                if (trackers.ContainsKey(prev.definition_ID))
                 {
-                    trackers[prev] -= 1;
+                    trackers[prev.definition_ID] -= 1;
                 }
-                if (trackers.ContainsKey(setto))
+                if (trackers.ContainsKey(set_definition))
                 {
-                    trackers[setto] += 1;
+                    trackers[set_definition] += 1;
                 }
-                map[idx] = setto;
+                map[idx].SetDefinition(set_definition);
 
-                if (setto != prev)
+                if (set_definition != prev.definition_ID)
                 {
                     changed = true;
                 }
