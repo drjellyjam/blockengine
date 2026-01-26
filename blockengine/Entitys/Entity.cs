@@ -9,20 +9,27 @@ namespace blockengine.Entitys
 {
     public abstract class Entity
     {
-        public int Id;
+        protected string Id;
         public string Name;
         public Vector3 Position;
         protected World world;
-        public Entity(World _world, int _Id, string _Name, Vector3 _position)
+        public Entity(World _world, string _Name, Vector3 _position)
         {
             world = _world;
-            Id = _Id;
+            Id = Guid.NewGuid().ToString();
             Name = _Name;
             Position = _position;
         }
 
-        public abstract void Draw();
-        public abstract void Tick();
-        public abstract void Start();
+        public string GetID()
+        {
+            return Id;
+        }
+        public abstract void DrawGui();
+        public abstract void Draw(); // on draw
+        public abstract void Tick(); // on world tick
+        public abstract void Update(float deltatime); // on frame
+        public abstract void Start(); // on entity spawn
+        public abstract void End();
     }
 }

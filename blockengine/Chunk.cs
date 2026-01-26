@@ -10,32 +10,18 @@ namespace blockengine
 {
     public class Chunk
     {
-        public enum chunk_generation_status
-        {
-            ungenerated = -1,
-            generating = 0,
-            generated = 1,
-        }
-
         public Map3D map;
         public ChunkMeshGenerator generator;
         public Matrix4x4 transform;
-        public chunk_generation_status status;
-        public bool uploaded_meshes = false;
-        public bool built_meshes = false;
         public Int3 chunkpos;
-
-        public bool player_edited = false;
         public Chunk(Int3 chunkpos)
         {
-            (chunkpos * Globals.chunk_size).Print();
+            //(chunkpos * Globals.chunk_size).Print();
             this.chunkpos = chunkpos;
             transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation((chunkpos * Globals.chunk_size).to_vector3()) * Matrix4x4.CreateScale(Globals.BlockScale));
-            map = new Map3D( Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, "AIR" );
-            map.AddTracker("AIR");
+            map = new Map3D( Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, "GREY_STONE");
+            
             generator = new ChunkMeshGenerator();
-
-            status = chunk_generation_status.ungenerated;
         }
 
         public bool UploadMeshes()
@@ -43,14 +29,12 @@ namespace blockengine
             generator.UnloadMesh();
             bool b1 = generator.GenerateMesh();
             bool b2 = generator.GenerateMeshT();
-            uploaded_meshes = b1 || b2;
 
             return b1 || b2;
         }
         public void UnloadMesh()
         {
             generator.UnloadMesh();
-            uploaded_meshes = false;
         }
         public bool IsChanged()
         {
@@ -59,12 +43,12 @@ namespace blockengine
 
         public bool IsAir()
         {
-            return map.GetTrackerValue("AIR") == map.fullsize;
+            return map.air >= map.fullsize;
         }
 
         public bool IsFull()
         {
-            return map.GetTrackerValue("AIR") == 0;
+            return map.air <= 0;
         }
 
         public bool WillBuild()

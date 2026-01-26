@@ -127,17 +127,15 @@ namespace blockengine.Entitys
             float mousesensitivity = 30f;
 
             Vector2 mousedelta = Raylib.GetMouseDelta();
-            //Console.WriteLine(mousedelta.ToString());
             camlookyaw -= mousedelta.X * mousesensitivity * deltatime;
             camlookpitch -= mousedelta.Y * mousesensitivity * deltatime;
             UpdateCamera();
 
             Vector3 camforward = Vector3.Normalize(GetCameraForward()*new Vector3(1,1,0));
-            Vector3 camright = GetCameraRight();
+            Vector3 camright = Vector3.Normalize(GetCameraRight() * new Vector3(1, 1, 0));
 
             float forwardaxis = (Raylib.IsKeyDown(KeyboardKey.W) - Raylib.IsKeyDown(KeyboardKey.S));
             float rightaxis = (Raylib.IsKeyDown(KeyboardKey.A) - Raylib.IsKeyDown(KeyboardKey.D));
-
 
             float spd = 4f;
 

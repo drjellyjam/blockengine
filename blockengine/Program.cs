@@ -1,14 +1,52 @@
 ﻿using blockengine;
 using blockengine.Entitys;
 using Raylib_cs;
+using System.Collections;
 using System.Numerics;
 using System.Security.Cryptography;
 
 namespace BlockEngine;
 class Program
 {
+    private static List<Int3> list = new List<Int3>();
+    private static void flood(List<Int3> poslist,int d = 4,bool print = false)
+    {
+        if (d <= 0)
+        {
+            return;
+        }
+
+        var _newlist = new List<Int3>();
+        foreach (Int3 pos in poslist)
+        {
+            if (!list.Contains(pos))
+            {
+                list.Add(pos);
+                if (print)
+                {
+                    Console.WriteLine("new Int3(" + pos.x + "," + pos.y + "," + pos.z + "),");
+                }
+                foreach (Int3 norm in Globals.around_positions)
+                {
+                    var _npos = pos + norm;
+                    if (!list.Contains(_npos))
+                    {
+                        _newlist.Add(_npos);
+
+                    }
+                }
+            }
+        }
+        flood(_newlist, d - 1, print);
+    }
     public static void Main()
     {
+        //Console.WriteLine("precalculated flood positions");
+        //flood(new List<Int3>(){ new Int3(0,0,0) },2);
+        //Console.WriteLine("");
+        //Console.WriteLine("Done " + list.Count);
+        //return;
+        
         bool hacky_fix_draw_glitch = true;
         bool draw_debug = false;
 
@@ -19,26 +57,22 @@ class Program
 
         Raylib.InitWindow(1280, 720, "Block Engine");
 
-        World world = new World(new WorldInfo("test world"));
-        world.AddChunk(new Int3(0, 0, 0));
-        //world.Generate();
-        //world.Build();
+        World world = new World(new WorldInfo("test world",67));
+        
+        world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
 
-        Player player = new Player(world);
-        player.Position = new Vector3(8,8, 2);
+        float max_frames = 0.05f;
+        float bi = max_frames;
 
-        int max_frames = 5;
-        int bi = 0;
-
+        ModelHandler.LoadModels();
         TextureHandler.CreateAtlasTextures();
 
+        
         Task.Run(() =>
         {
-            while (true)
-            {
-                world.GenerateAroundFlood(player.Position);
-            }
+           world.GenerateArea();
         });
+        
 
         while (!Raylib.WindowShouldClose())
         {
@@ -49,13 +83,13 @@ class Program
 
             //update
 
-            player.Update();
+            world.UpdateEntities();
 
-            bi++;
-            if (bi >= max_frames)
-            {
-                bi = 0;
-                world.UploadChunkQueue();
+            bi -= 1 * Raylib.GetFrameTime();
+            if (bi <= 0) {
+                bi = max_frames;
+
+                world.UploadChunks();
             }
 
             //drawing
@@ -68,7 +102,7 @@ class Program
 
             //3d
 
-            Raylib.BeginMode3D(player.cam);
+            Raylib.BeginMode3D(world.cam);
 
             if (hacky_fix_draw_glitch)
             {
@@ -76,8 +110,8 @@ class Program
                 Raylib.DrawCube(Vector3.Zero, 1, 1, 1, Color.White);
             }
 
-            world.Draw(player.cam,3, draw_debug);
-            player.Draw();
+            world.DrawAllChunks();
+            world.DrawEntities();
 
             Raylib.EndMode3D();
 
@@ -85,19 +119,16 @@ class Program
 
             Raylib.DrawFPS(10, 10);
 
-            var pos = new Int3((int)player.Position.X, (int)player.Position.Y, (int)player.Position.Z);
-            var chunkpos = world.GetChunkBlockPosWorldPos(pos);
-            var chunk_block_pos = world.GetChunkPosWorldPos(pos);
-            Raylib.DrawText("(" + chunkpos.x + ", " + chunkpos.y + ", " + chunkpos.z + ")", 10, 64, 24, Color.White);
-            Raylib.DrawText("(" + chunk_block_pos.x + ", " + chunk_block_pos.y + ", " + chunk_block_pos.z + ")", 10, 128, 24, Color.White);
-            Raylib.DrawText(world.GetLoadedChunksCount().ToString(), 10, 128+64, 24, Color.Red);
-
             //Raylib.DrawTexture(TextureHandler.block_atlas.Texture, 0, 0, Color.Red);
 
             Raylib.EndDrawing();
         }
+
+        lock (world)
+        {
+            world.Cleanup();
+        }
         TextureHandler.Cleanup();
-        world.Cleanup();
 
         Raylib.CloseWindow();
     }

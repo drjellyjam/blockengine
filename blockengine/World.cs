@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Text.Json.Nodes;
 using System.Runtime.CompilerServices;
 using blockengine.Entitys;
+using System.Reflection.Metadata;
 
 namespace blockengine
 {
@@ -28,44 +29,31 @@ namespace blockengine
     public class World
     {
         public WorldInfo info;
-        private WorldGenerator world_generator;
 
-        private Dictionary<string, Chunk> chunks;
-        private List<Entity> entities;
+        private Vector3 last_player_position;
+        private Int3 last_player_chunk_position;
 
-        private List<Int3> chunks_to_upload;
-        private List<Int3> uploaded_chunks;
-        private List<Int3> chunks_to_unload;
+        private Dictionary<Int3, Chunk> chunks;
+        private FlipList<Int3> chunk_upload_list;
 
-        //chunk drawling
-        Int3 last_viewable_position;
+        private Dictionary<string, Entity> entities;
+        private Dictionary<string, Entity> garbage_entities;
+        private string focused_entity_id = "-1";
+
+        private FastNoiseLite fnl;
+
+        public Camera3D cam;
 
         Material chunk_material;
         int shader_uniform_texture_pos;
         int shader_uniform_camera_pos_pos;
 
-        private int render_distance = 2;
-        private int unload_distance = 4;
         //Texture2D shadtex;
         public World(WorldInfo world_info)
         {
             info = world_info;
-
-            world_generator = new WorldGenerator(info.world_seed);
-
-            world_generator.AddCarver(0.8f, 0.008f, 3);
-
-            var spaghetti_fnl = new FastNoiseLite(info.world_seed);
-
-            spaghetti_fnl.SetFractalType(FastNoiseLite.FractalType.Ridged);
-            spaghetti_fnl.SetFractalOctaves(2);
-            spaghetti_fnl.SetFrequency(0.007f);
-
-            world_generator.AddCarverEX(0.98f, 0, spaghetti_fnl);
-
-            chunks_to_upload = new List<Int3>();
-            uploaded_chunks = new List<Int3>();
-            chunks_to_unload = new List<Int3>();
+            fnl = new FastNoiseLite(info.world_seed);
+            fnl.SetFrequency(0.02f);
 
             chunk_material = Raylib.LoadMaterialDefault();
             Shader shad = Raylib.LoadShader("Assets/Shaders/terrain_shader.vs", "Assets/Shaders/terrain_shader.fs");
@@ -75,155 +63,101 @@ namespace blockengine
 
             //Raylib.SetMaterialTexture(ref chunk_material, MaterialMapIndex.Albedo, Raylib.LoadTexture("Assets/blocktextureatlas.png"));
 
-            chunks = new Dictionary<string, Chunk>();
+            entities = new Dictionary<string, Entity>();
+            garbage_entities = new Dictionary<string, Entity>();
+
+            chunks = new Dictionary<Int3, Chunk>();
+            chunk_upload_list = new FlipList<Int3>(false);
+
+            cam = new Camera3D();
+            cam.Position = Vector3.Zero;
+            cam.Target = new Vector3(1, 0, 0);
+            cam.Up = new Vector3(0, 0, 1);
+            cam.FovY = 70f;
+            cam.Projection = CameraProjection.Perspective;
+
             var zero = new Int3(0, 0, 0);
-            
-            if (File.Exists(GetChunkSaveDirectory(zero)))
+        }
+
+        #region ENTITY SYSTEM
+        public bool AddEntity(Entity entity, bool is_focus = false)
+        {
+            if (!entities.ContainsKey(entity.GetID()))
             {
-                LoadChunk(zero);
+                entities.Add(entity.GetID(), entity);
+
+                entity.Start();
+
+                if (is_focus)
+                {
+                    focused_entity_id = entity.GetID();
+                }
+                return true;
             }
-            else
+            return false;
+        }
+
+        public bool DestroyEntity(string ID)
+        {
+            if (entities.ContainsKey(ID))
             {
-                AddChunk(zero);
-                Generate(zero);
+                var entity = entities[ID];
+                entity.End();
+
+                entities.Remove(ID);
+                garbage_entities.Add(ID, entity); // add to garbage to be destroyed at the end of the cycle
+
+                return true;
             }
-        }
-        //public int PositionToIndex(Vector3 pos)
-        //{
-        //    return ((int)pos.Z * width * height) + ((int)pos.Y * width) + (int)pos.X;
-        //}
-
-        //public Vector3 IndexToPosition(int idx)
-        //{
-        //    int x, y, z;
-        //    x = idx % width;
-        //    y = (idx / width) % height;
-        //    z = idx / (width * height);
-        //    return new Vector3(x, y, z);
-        //}
-
-        public string GetChunkID(Int3 pos)
-        {
-            return pos.x.ToString() + pos.y.ToString() + pos.z.ToString();
+            return false;
         }
 
-
-        public string GetChunkSaveDirectory(Int3 pos)
+        public Entity? GetFocusEntity()
         {
-            return "Saves/" + info.world_name + "/chunk" + pos.x + "_" + pos.y + "_" + pos.z;
-        }
-        public bool OutOfBounds(Int3 pos)
-        {
-            return !chunks.ContainsKey(GetChunkID(pos));
-            //return (pos.X < 0 || pos.X > width - 1 || pos.Y < 0 || pos.Y > height - 1 || pos.Z < 0 || pos.Z > depth - 1);
-        }
-
-        //World Functions
-        public Chunk GetChunk(Int3 pos)
-        {
-            var id = GetChunkID(pos);
-            if (chunks.ContainsKey(id))
+            if (entities.ContainsKey(focused_entity_id))
             {
-                return chunks[id];
+                return entities[focused_entity_id];
             }
             return null;
         }
 
-        public void AddChunk(Int3 pos)
+        public void UpdateEntities()
         {
-            string id = GetChunkID(pos);
-            if (!chunks.ContainsKey(id))
+            var deltatime = Globals.GetDelta();
+            if (entities.ContainsKey(focused_entity_id))
             {
-                chunks[id] = new Chunk(pos);
+                var _focused_entity = entities[focused_entity_id];
+                _focused_entity.Update(deltatime);
+            }
+
+            foreach (Entity entity in entities.Values)
+            {
+                if (entity.GetID() != focused_entity_id)
+                {
+                    entity.Update(deltatime);
+                }
+            }
+
+            //destroy garbage
+
+            foreach (Entity entity in garbage_entities.Values)
+            {
+                GC.SuppressFinalize(entity);
             }
         }
 
-        private void RemoveChunk(Int3 pos)
+        public void DrawEntities()
         {
-            string id = GetChunkID(pos);
-            if (chunks.ContainsKey(id))
+            foreach (Entity entity in entities.Values)
             {
-                chunks.Remove(id);
-                if (uploaded_chunks.Contains(pos))
-                {
-                    uploaded_chunks.Remove(pos);
-                }
-                if (chunks_to_upload.Contains(pos))
-                {
-                    chunks_to_upload.Remove(pos);
-                }
-                //Console.WriteLine("Removed chunk");
+                entity.Draw();
             }
         }
 
-        public void SaveChunk(Int3 pos)
-        {
-            Chunk chunk = GetChunk(pos);
+        #endregion
 
-            if (chunk != null)
-            {
-                if (!Directory.Exists("Saves/" + info.world_name + "/"))
-                {
-                    Directory.CreateDirectory("Saves/" + info.world_name + "/");
-                }
-                string chunk_file_path = GetChunkSaveDirectory(pos);
-
-                FileStream chunk_file = File.Create(chunk_file_path);
-                chunk_file.Write(chunk.map.too_bytes(), 0, chunk.map.fullsize);
-                chunk_file.Close();
-
-                Console.WriteLine("saved chunk : " + GetChunkID(pos));
-            }
-        }
-
-        private void LoadChunk(Int3 pos)
-        {
-            if (Directory.Exists("Saves/" + info.world_name + "/"));
-            {
-                string chunk_file_path = GetChunkSaveDirectory(pos);
-
-                if (File.Exists(chunk_file_path))
-                {
-                    if (!OutOfBounds(pos))
-                    {
-                        UnloadChunk(pos, false);
-                    }
-                    AddChunk(pos);
-                    Chunk chunk = GetChunk(pos);
-
-                    chunk.status = Chunk.chunk_generation_status.generating;
-
-                    byte[] bytes = File.ReadAllBytes(chunk_file_path);
-                    for (int i = 0; i < chunk.map.fullsize; i++)
-                    {
-                        chunk.map.Set(chunk.map.IndexToPosition(i), "GREY_STONE");
-                    }
-                    //Console.WriteLine("");
-                    Console.WriteLine("Loaded chunk: " + chunk_file_path);
-
-                    chunk.status = Chunk.chunk_generation_status.generated;
-                }
-            }
-            
-        }
-
-        private void UnloadChunk(Int3 pos,bool save = true) //remove chunk from world safely
-        {
-            Chunk chunk = GetChunk(pos);
-            if (chunk != null)
-            {
-                if (chunk.player_edited && save)
-                {
-                    SaveChunk(pos);
-                }
-                chunk.UnloadMesh();
-                RemoveChunk(pos);
-
-                Console.WriteLine("unloaded chunk: " + GetChunkID(pos));
-            }
-        }
-
-        public Int3 GetChunkPosWorldPos(Int3 world_block_pos)
+        #region CHUNK SYSTEM
+        public Int3 WBP_to_ChunkPos(Int3 world_block_pos)
         {
             return new Int3(
                 (int)Math.Floor((float)world_block_pos.x / (float)Globals.chunk_size.x),
@@ -231,8 +165,7 @@ namespace blockengine
                 (int)Math.Floor((float)world_block_pos.z / (float)Globals.chunk_size.z)
             );
         }
-
-        public Int3 GetChunkBlockPosWorldPos(Int3 world_block_pos)
+        public Int3 WBP_to_CBP(Int3 world_block_pos)
         {
             return new Int3(
                 (int)Globals.better_mod((float)world_block_pos.x, (float)Globals.chunk_size.x),
@@ -240,97 +173,9 @@ namespace blockengine
                 (int)Globals.better_mod((float)world_block_pos.z, (float)Globals.chunk_size.z)
             );
         }
-
-        public int GetLoadedChunksCount()
-        {
-            return chunks.Count();
-        }
-
         public float ChunkDistance(Int3 chunk1, Int3 chunk2)
         {
-             return Vector3Distance(chunk1.to_vector3(), chunk2.to_vector3());
-        }
-
-        public Block? GetBlock(Int3 world_block_pos)
-        {
-            Int3 chunk_pos = GetChunkPosWorldPos(world_block_pos);
-            Chunk chunk = GetChunk(chunk_pos);
-            if (chunk != null)
-            {
-                Int3 chunk_block_pos = GetChunkBlockPosWorldPos(world_block_pos);
-                return chunk.map.Get(chunk_block_pos);
-            }
-            return null;
-        }
-        public void SetBlock(Int3 world_block_pos,string setto,bool build_chunks = true)
-        {
-            Int3 chunk_pos = GetChunkPosWorldPos(world_block_pos);
-            Chunk chunk = GetChunk(chunk_pos);
-            if (chunk != null)
-            {
-                Int3 chunk_block_pos = GetChunkBlockPosWorldPos(world_block_pos);
-                Console.WriteLine(chunk_block_pos.x + ", " + chunk_block_pos.y + ", " + chunk_block_pos.z);
-                Console.WriteLine(chunk_pos.x + ", " + chunk_pos.y + ", " + chunk_pos.z);
-                chunk.map.Set(chunk_block_pos, setto);
-                chunk.player_edited = true;
-
-                if (build_chunks)
-                {
-                    bool left = chunk_block_pos.x == 0;
-                    bool right = chunk_block_pos.x == Globals.chunk_size.x - 1;
-
-                    bool forward = chunk_block_pos.y == 0;
-                    bool backward = chunk_block_pos.y == Globals.chunk_size.y - 1;
-
-                    bool bottom = chunk_block_pos.z == 0;
-                    bool top = chunk_block_pos.z == Globals.chunk_size.z - 1;
-
-                    Task.Run(() => {
-                        BuildChunk(chunk_pos, false,true,true);
-
-                        if (left)
-                        {
-                            BuildChunk(chunk_pos + new Int3(-1, 0, 0), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(-1, 0, 0));
-                        }
-                        if (right)
-                        {
-                            BuildChunk(chunk_pos + new Int3(1, 0, 0), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(1, 0, 0));
-                        }
-                        if (forward)
-                        {
-                            BuildChunk(chunk_pos + new Int3(0, -1, 0), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(0, -1, 0));
-                        }
-                        if (backward)
-                        {
-                            BuildChunk(chunk_pos + new Int3(0, 1, 0), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(0, 1, 0));
-                        }
-                        if (bottom)
-                        {
-                            BuildChunk(chunk_pos + new Int3(0, 0, -1), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(0, 0, -1));
-                        }
-                        if (top)
-                        {
-                            BuildChunk(chunk_pos + new Int3(0, 0, 1), false, true, true);
-                            //build_list.Add(chunk_pos + new Vector3(0, 0, 1));
-                        }
-                    });
-                }
-            }
-        }
-
-        public bool GetBlockExists(string block_def)
-        {
-            BlockDefinition? bd = Globals.BlockDefinitions[block_def];
-            if (bd != null)
-            {
-                return bd.Exists;
-            }
-            return false;
+            return Vector3Distance(chunk1.to_vector3(), chunk2.to_vector3());
         }
 
         public BoxCollider GetBlockCollider(Int3 world_block_pos)
@@ -346,8 +191,8 @@ namespace blockengine
                     return c;
                 }
             }
-            
-            return new BoxCollider(world_block_pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f,-0.5f,-0.5f),new Vector3(0.5f,0.5f,0.5f));
+
+            return new BoxCollider(world_block_pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.5f, 0.5f, 0.5f));
         }
 
         public RaycastResult? Raycast(Vector3 RayStart, Vector3 Direction)
@@ -468,26 +313,235 @@ namespace blockengine
             return result;
         }
 
-        //CHUNK FUNCTIONS
-        public void Draw(Camera3D cam, int distance,bool drawdebug = false)
+        public Chunk? GetChunk(Int3 chunk_pos)
         {
-            Int3 start_chunk_pos = Globals.WorldPosToChunkPos(cam.Position);
-            last_viewable_position = start_chunk_pos;
+            Chunk? _val = null;
+            chunks.TryGetValue(chunk_pos, out _val);
+            return _val;
+        }
 
-            for (int z = -distance; z<=distance; z++)
+        public Block? GetBlock(Int3 world_block_pos)
+        {
+            Int3 blockpos = WBP_to_CBP(world_block_pos);
+            Int3 chunkpos = WBP_to_ChunkPos(world_block_pos);
+
+            Chunk? chunk = GetChunk(chunkpos);
+            if (chunk != null)
             {
-                for (int y = -distance; y <= distance; y++)
-                {
-                    for (int x = -distance; x <= distance; x++)
-                    {
-                        Int3 chunkpos = start_chunk_pos + new Int3(x, y, z);
+                return chunk.map.Get(blockpos);
+            }
+            return null;
+        }
 
-                        Chunk chunk = GetChunk(chunkpos);
+        public bool SetBlock(Int3 world_block_pos,string block_def_id)
+        {
+            Int3 blockpos = WBP_to_CBP(world_block_pos);
+            Int3 chunkpos = WBP_to_ChunkPos(world_block_pos);
+
+            Chunk? chunk = GetChunk(chunkpos);
+            if (chunk != null)
+            {
+                bool chunk_was_changed = chunk.map.Set(blockpos, block_def_id);
+
+                if (chunk_was_changed)
+                {
+                    Task.Run(() =>
+                    {
+                        ChunkBuildMesh(chunkpos);
+                        foreach (Int3 norm in Globals.block_normals)
+                        {
+                            Int3 at_chunkpos = WBP_to_ChunkPos(world_block_pos + norm);
+                            if (at_chunkpos != chunkpos)
+                            {
+                                Chunk? at_chunk = GetChunk(chunkpos);
+                                if (at_chunk != null && at_chunk.WillBuild())
+                                {
+                                    ChunkBuildMesh(chunkpos + norm);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        public bool ChunkExists(Int3 chunk_pos)
+        {
+            return chunks.ContainsKey(chunk_pos);
+        }
+
+        public bool ChunkCreate(Int3 chunk_pos)
+        {
+            if (chunks.ContainsKey(chunk_pos))
+            {
+                return false;
+            }
+
+            chunks.Add( chunk_pos, new Chunk(chunk_pos) );
+
+            return true;
+        }
+
+        public void ChunkBuildMesh(Int3 chunk_pos)
+        {
+            Chunk? chunk = GetChunk(chunk_pos);
+            if (chunk != null)
+            {
+                chunk.generator.Clear();
+                for (int idx = 0; idx < chunk.map.fullsize; idx++)
+                {
+                    var CBP = chunk.map.IndexToPosition(idx);
+                    var WBP = (chunk_pos * Globals.chunk_size) + CBP;
+                    var CBP_v = CBP.to_vector3();
+
+                    Block? block = GetBlock(WBP);
+                    if (block == null) { return; }
+                    BlockDefinition block_def = block.GetDefinition();
+
+                    if (!block_def.Exists || block_def.Translucent)
+                    {
+                        foreach (Int3 norm in Globals.block_normals)
+                        {
+                            var at_WBP = WBP + norm;
+                            
+                            Block? at_block = GetBlock(at_WBP);
+                            if (at_block == null) { return; }
+                            BlockDefinition at_block_def = at_block.GetDefinition();
+
+                            if (at_block_def.Exists)
+                            {
+                                if (!block_def.Translucent || block.definition_ID != at_block.definition_ID)
+                                {
+                                    chunk.generator.AddBlockFace(CBP_v, at_block_def, norm, true);
+                                }
+                            }
+                            else
+                            {
+                                if (block_def.Translucent && block_def.BlockModel == null)
+                                {
+                                    chunk.generator.AddBlockFace(CBP_v, block_def, norm);
+                                }
+                            }
+                        }
+
+                        //model block
+                        if (block_def.BlockModel != null)
+                        {
+                            //chunk.generator.AddParsedOBJ(block_def.BlockModel, CBP_v + (Vector3.One * 0.5f), Vector3.Zero, Vector3.One * 0.1f);
+                        }
+                    }
+                }
+
+                chunk_upload_list.Add(chunk_pos);
+            }
+            
+        }
+
+        public void GenerateArea()
+        {
+            var size = 3;
+            var buildsize = size - 1;
+
+            Console.WriteLine("GENERATING...");
+
+            for (int x = -size; x<=size; x++)
+            {
+                for (int y = -size; y <=size; y++)
+                {
+                    for (int z = -size; z <=size; z++)
+                    {
+                        var pos = new Int3(x, y, z);
+                        ChunkCreate(pos);
+                        ChunkGenerate(pos);
+                    }
+                }
+            }
+
+            Console.WriteLine("BUILDING...");
+
+            for (int x = -buildsize; x <= buildsize; x++)
+            {
+                for (int y = -buildsize; y <= buildsize; y++)
+                {
+                    for (int z = -buildsize; z <= buildsize; z++)
+                    {
+                        var pos = new Int3(x, y, z);
+                        Chunk? chunk = GetChunk(pos);
+                        if (chunk != null && chunk.WillBuild())
+                        {
+                            ChunkBuildMesh(pos);
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine("Generation Cycle Finished!");
+        }
+
+        public void UploadChunks()
+        {
+            chunk_upload_list.Flip();
+
+            List<Int3> upload_list = chunk_upload_list.GetInactiveList();
+            var _amt = upload_list.Count;
+
+            lock (upload_list)
+            {
+                foreach (Int3 chunk_pos in upload_list)
+                {
+                    Chunk? chunk = GetChunk(chunk_pos);
+
+                    if (chunk != null)
+                    {
+                        chunk.UploadMeshes();
+                    }
+                }
+                upload_list.Clear();
+            }
+
+            if (_amt > 0)
+            {
+                Console.WriteLine("Upload Cycle Finished (" + _amt.ToString() + ")");
+            }
+        }
+
+        public void ChunkGenerate(Int3 chunk_pos)
+        {
+            Chunk? chunk = GetChunk(chunk_pos);
+            if (chunk != null)
+            {
+                for (int idx = 0; idx < chunk.map.fullsize; idx++)
+                {
+                    var CBP = chunk.map.IndexToPosition(idx);
+                    var WBP = (chunk_pos * Globals.chunk_size) + CBP;
+                    var v = "GREY_STONE";
+
+                    if (fnl.GetNoise(WBP.x, WBP.y, WBP.z) > 0.5f)
+                    {
+                        v = "AIR";
+                    }
+
+                    chunk.map.Set(CBP, v);
+                }
+            }
+        }
+        public void DrawAllChunks()
+        {
+            Raylib.SetShaderValueTexture(chunk_material.Shader, shader_uniform_texture_pos, TextureHandler.block_atlas.Texture);
+            var buildsize = 2;
+            for (int x = -buildsize; x <= buildsize; x++)
+            {
+                for (int y = -buildsize; y <= buildsize; y++)
+                {
+                    for (int z = -buildsize; z <= buildsize; z++)
+                    {
+                        var pos = new Int3(x, y, z);
+                        Chunk? chunk = GetChunk(pos);
                         if (chunk != null)
                         {
-                            
-                            Raylib.SetShaderValueTexture(chunk_material.Shader, shader_uniform_texture_pos, TextureHandler.block_atlas.Texture);
-                            Raylib.SetShaderValue(chunk_material.Shader, shader_uniform_camera_pos_pos, last_viewable_position, ShaderUniformDataType.Vec3);
                             if (chunk.generator.Drawable)
                             {
                                 Raylib.DrawMesh(chunk.generator.mesh, chunk_material, chunk.transform);
@@ -496,424 +550,17 @@ namespace blockengine
                             {
                                 Raylib.DrawMesh(chunk.generator.meshT, chunk_material, chunk.transform);
                             }
-                            if (drawdebug)
-                            {
-                                Raylib.DrawCubeWires(((chunkpos * Globals.chunk_size) + (Globals.chunk_size / 2)).to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
-                            }
+                            Raylib.DrawCubeWires(pos.to_vector3() * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                         }
                     }
                 }
             }
         }
-        private bool BuildChunk(Int3 chunkpos,bool and_upload = false,bool force = false,bool important = false)
-        {
-            Chunk chunk = GetChunk(chunkpos);
-            if (chunk != null)
-            {
-                if (!chunk.map.changed && !force)
-                {
-                    return false;
-                }
-                //if (chunk.WontBuild())
-                //{
-                //    Console.WriteLine("Not attempting to build air chunk.");
-                //   chunk.map.changed = false;
-                //    return false;
-                //}
 
-                lock (chunk)
-                {
-                    Int3 world_chunk_pos = chunkpos * Globals.chunk_size;
-                    chunk.generator.Clear();
-                    //chunk.generator.UnloadMesh();
+        #endregion
 
-                    for (int b = 0; b < chunk.map.fullsize; b++)
-                    {
-
-                        Int3 chunk_block_pos = chunk.map.IndexToPosition(b);
-                        Int3 world_block_pos = world_chunk_pos + chunk_block_pos;
-                        Vector3 cbp_v = chunk_block_pos.to_vector3();
-
-                        Block? block = chunk.map.Get(chunk_block_pos);
-
-                        if (block == null)
-                        {
-                            return false;
-                        }
-
-                        BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
-
-                        if (blockdef != null && blockdef.Exists)
-                        {
-                            foreach (Int3 normal in Globals.block_normals)
-                            {
-                                Block? atblock = GetBlock(world_block_pos + normal);
-                                
-                                if (atblock != null)
-                                {
-                                    BlockDefinition? atblockdef = Globals.BlockDefinitions[atblock.definition_ID];
-
-                                    if (!atblockdef.Exists || atblockdef.Translucent)
-                                    {
-                                        bool draw = true;
-                                        if (blockdef.Translucent)
-                                        {
-                                            draw = !(block == atblock);
-                                        }
-                                        if (draw)
-                                        {
-                                            if (normal == Globals.block_normals[5])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Top);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            }
-                                            else if (normal == Globals.block_normals[4])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Bottom);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            }
-                                            else if (normal == Globals.block_normals[2])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Forward);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            }
-                                            else if (normal == Globals.block_normals[3])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Backward);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            }
-                                            else if (normal == Globals.block_normals[1])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Right);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                            }
-                                            else if (normal == Globals.block_normals[0])
-                                            {
-                                                UV bUv = blockdef.GetBlockUV(BlockFace.Left);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                                                chunk.generator.AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            /*
-                            if (topblockdef != null && (!topblockdef.Exists || topblockdef.Translucent) )
-                            {
-                                bool draw = true;
-                                if (blockdef.Translucent)
-                                {
-                                    draw = !(block == topblock);
-                                }
-                                if (draw)
-                                {
-
-                                }
-                            }
-                            */
-                        }
-                    }
-
-                    //chunk.generator.GenerateMesh();
-                    //chunk.generator.GenerateMeshT();
-                    chunk.map.changed = false;
-
-                    Console.WriteLine("MESHING: ");
-                    chunkpos.Print();
-                }
-
-                if (and_upload)
-                {
-                    chunk.UploadMeshes();
-                }
-                else
-                {
-                    if (!chunks_to_upload.Contains(chunkpos))
-                    {
-                        if (important)
-                        {
-                            chunks_to_upload.Insert(0, chunkpos);
-                        }
-                        else
-                        {
-                            chunks_to_upload.Add(chunkpos);
-                        }
-                    }
-                }
-
-                Console.WriteLine("Meshed Chunk");
-            }
-
-            return true;
-        }
-        public void GenerateAroundFlood(Vector3 position)
-        {
-            int distance = render_distance;
-
-            Int3 chunk_pos = Globals.WorldPosToChunkPos(position);
-
-            ///UNLOAD OLD CHUNKS
-            foreach (string id in chunks.Keys)
-            {
-                Chunk unload_chunk = chunks[id];
-                Int3 unload_chunkpos = unload_chunk.chunkpos;
-
-                if (!chunks_to_unload.Contains(unload_chunkpos))
-                {
-                    float dist = ChunkDistance(unload_chunkpos, chunk_pos);
-                    if (dist > unload_distance)
-                    {
-                        chunks_to_unload.Add(unload_chunkpos);
-                    }
-                }
-            }
-
-            //load new ones
-            var lists = new List<Int3>[2]
-            {
-                new List<Int3>(),
-                new List<Int3>()
-            };
-            int list_id = 1;
-            lists[0].Add(chunk_pos);
-
-            Chunk start_chunk = GetChunk(chunk_pos);
-
-            int d = 0;
-            while(d < distance)
-            {
-                foreach (Int3 pos in lists[1 - list_id])
-                {
-                    lock (chunks)
-                    {
-                        if (OutOfBounds(pos))
-                        {
-                            if (File.Exists(GetChunkSaveDirectory(pos)))
-                            {
-                                LoadChunk(pos);
-                            }
-                            else
-                            {
-                                AddChunk(pos);
-                                Generate(pos);
-                            }
-                        }
-                    }
-                    Chunk Current_chunk = GetChunk(pos);
-
-                    foreach (Int3 normal in Globals.around_positions)
-                    {
-                        lock (chunks)
-                        {
-                            if (OutOfBounds(pos + normal))
-                            {
-                                if (File.Exists(GetChunkSaveDirectory(pos + normal)))
-                                {
-                                    LoadChunk(pos + normal);
-                                }
-                                else
-                                {
-                                    AddChunk(pos + normal);
-                                    Generate(pos + normal);
-                                }
-                            }
-                            //Chunk next_chunk = GetChunk(pos + normal);
-                        }
-                        bool add = true;
-
-                        if (start_chunk != null)
-                        {
-                            add = false;
-                            if (start_chunk.WillBuild() && Current_chunk.WillBuild())
-                            {
-                                add = true;
-                            }
-                            if (start_chunk.WontBuild())
-                            {
-                                add = true;
-                            }
-                        }
-
-                        if (add)
-                        {
-                            lists[list_id].Add(pos + normal);
-                        }
-                    }
-
-                    lock ( chunks )
-                    {
-                        if (!uploaded_chunks.Contains(pos))
-                        {
-                            BuildChunk(pos);
-                        }
-                    }
-
-                    if (last_viewable_position != chunk_pos)
-                    {
-                        break;
-                    }
-                }
-
-                list_id = 1 - list_id;
-                lists[list_id].Clear();
-
-                d++;
-
-                
-            }
-
-            //Console.WriteLine("DONE GENERATING AROUND");
-        }
-
-        public void UploadChunkQueue()
-        {
-            for (int i = 0; i<3; i++)
-            {
-                if (chunks_to_unload.Count() > 0)
-                {
-                    Int3 pos = chunks_to_unload[0];
-
-                    if (ChunkDistance(pos, last_viewable_position) > unload_distance)
-                    {
-                        UnloadChunk(pos);
-                    }
-
-                    chunks_to_unload.RemoveAt(0);
-                }
-
-                if (chunks_to_upload.Count() > 0)
-                {
-
-                    Int3 pos = chunks_to_upload[0];
-
-                    Chunk chunk = GetChunk(pos);
-                    if (chunk != null)
-                    {
-                        chunk.UploadMeshes();
-                        uploaded_chunks.Add(pos);
-                    }
-
-                    chunks_to_upload.RemoveAt(0);
-                }
-            }
-        }
-
-        private void Generate(Int3[] chunk_array)
-        {
-            foreach (Int3 chunkpos in chunk_array)
-            {
-                Generate(chunkpos);
-            }
-        }
-        private void Generate(Int3 chunkpos)
-        {
-            Chunk chunk = GetChunk(chunkpos);
-
-            if (chunk != null)
-            {
-                lock (chunk)
-                {
-                    chunk.status = Chunk.chunk_generation_status.generating;
-
-                    for (int b = 0; b < chunk.map.fullsize; b++)
-                    {
-                        Int3 blockpos = chunk.map.IndexToPosition(b);
-                        Int3 worldpos = (chunkpos * Globals.chunk_size) + blockpos;
-
-                        string block_def_id = world_generator.GetBlock(worldpos);
-
-                        chunk.map.Set(blockpos, block_def_id); //
-                    }
-
-                    chunk.status = Chunk.chunk_generation_status.generated;
-                }
-                Console.WriteLine("GENERATING: ");
-                chunkpos.Print();
-            }
-            else
-            {
-                //Console.WriteLine("Could not generate chunk (" + chunkpos.X + ", " + chunkpos.Y + ", " + chunkpos.Z + ")");
-            }
-        }
-
-        private bool CanBuildChunk(Int3 chunkpos)
-        {
-            var left = chunkpos + new Int3(1, 0, 0);
-            var right = chunkpos + new Int3(1, 0, 0);
-            var up = chunkpos + new Int3(0, -1, 0);
-            var down = chunkpos + new Int3(0, 1, 0);
-            var forward = chunkpos + new Int3(0, 0, -1);
-            var backward = chunkpos + new Int3(0, 0, 1);
-            Chunk chunk = GetChunk(chunkpos);
-            return (!OutOfBounds(chunkpos) && chunk.status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(left) && GetChunk(left).status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(right) && GetChunk(right).status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(up) && GetChunk(up).status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(down) && GetChunk(down).status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(forward) && GetChunk(forward).status == Chunk.chunk_generation_status.generated) &&
-                (!OutOfBounds(backward) && GetChunk(backward).status == Chunk.chunk_generation_status.generated) && chunk.status == Chunk.chunk_generation_status.generated && !chunk.built_meshes;
-        }
-
-        private void UnloadAllChunkMeshes()
-        {
-            foreach (var chunkpos in chunks.Keys)
-            {
-                //Vector3 chunkpos = IndexToPosition(c);
-                Chunk chunk = chunks[chunkpos];
-                lock(chunk)
-                {
-                    chunk.UnloadMesh();
-                }
-            }
-        }
         public void Cleanup()
         {
-            // Raylib.UnloadTexture(shadtex);
-            foreach (string chunkpos in chunks.Keys)
-            {
-                Chunk chunk = chunks[chunkpos];
-                if (chunk.player_edited)
-                {
-                    SaveChunk(chunk.chunkpos);
-                }
-            }
-            Raylib.UnloadMaterial(chunk_material);
-            UnloadAllChunkMeshes();
         }
     }
 }

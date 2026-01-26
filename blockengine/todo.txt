@@ -1,19 +1,19 @@
 whenever you work on this again heres a todo list.
 
-[[LOW PRIORITY]]
+Remake chunk building system to fix seams
+  |___ Model blocks
+    |___ Functional blocks (chests, mines, tech)
 
-menu system (titlescreens and settings menus)
-add capability for larger textures in the texture atlas
-create systems for flexible biome creation
-create structure generation system
+Gui system
+  |___ Inventory system
+  | |___ pickaxes and equipables
+  |   |___ Crafting
+  |___ Pause menu
+    |___ Settings menu  
 
-[[MEDIUM PRIORITY]]
+Flexible world generation system
+  |___ Structures
+  |___ biomes
+  |___ Ores
 
-chunk loading and unloading system /// DONE but could be imporved
-entity system
-multiple world creation and loading
-chunk saving and loading /// DONE but could be imporved
-
-[[HIGH PRIORITY]]
-
-re-work block system
+Particle system

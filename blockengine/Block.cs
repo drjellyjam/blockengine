@@ -18,16 +18,16 @@ namespace blockengine
         Top = 4,
         Bottom = 5
     }
-    public class BlockFaces
+    public class BlockFaces<T>
     {
-        public string TOP;
-        public string BOTTOM;
-        public string LEFT;
-        public string RIGHT;
-        public string FORWARD;
-        public string BACKWARD;
+        public T TOP;
+        public T BOTTOM;
+        public T LEFT;
+        public T RIGHT;
+        public T FORWARD;
+        public T BACKWARD;
 
-        public BlockFaces(string _top, string _bottom, string _left, string _right, string _forward, string _backward)
+        public BlockFaces(T _top, T _bottom, T _left, T _right, T _forward, T _backward)
         {
             TOP = _top;
             BOTTOM = _bottom;
@@ -37,7 +37,7 @@ namespace blockengine
             BACKWARD = _backward;
         }
 
-        public BlockFaces(string _all)
+        public BlockFaces(T _all)
         {
             TOP = _all;
             BOTTOM = _all;
@@ -47,7 +47,7 @@ namespace blockengine
             BACKWARD = _all;
         }
 
-        public BlockFaces(string _top,string _bottom,string _sides)
+        public BlockFaces(T _top,T _bottom,T _sides)
         {
             TOP = _top;
             BOTTOM = _bottom;
@@ -83,27 +83,44 @@ namespace blockengine
         }
     }
 
+    public class BlockModel
+    {
+        public string model_file;
+        public string model_texture;
+        public BlockFaces<bool> gen_faces;
+        
+        public BlockModel(string _model_file, string _model_texture, BlockFaces<bool> _gen_faces)
+        {
+            model_file = _model_file;
+            gen_faces = _gen_faces;
+            model_texture = _model_texture;
+        }
+    }
     public class BlockDefinition
     {
         public string Name;
         public bool Exists;
         public bool NonSolid;
         public bool Translucent;
+        public BlockModel? BlockModel;
+
         public float durability;
 
         public BoxCollider Collider;
-        public BlockFaces FaceTextureIds;
-        public BlockDefinition(string _name,bool _exists = true, bool _nonsolid = false, bool _translucent = false, float _durability = 1f, BlockFaces? _face_texture_ids = null, Vector3? _collider_position = null, Vector3? _collider_min = null, Vector3? _collider_max = null)
+        public BlockFaces<string> FaceTextureIds;
+        public BlockDefinition(string _name,bool _exists = true, bool _nonsolid = false, bool _translucent = false, float _durability = 1f, BlockModel? _blockmodel = null, BlockFaces<string>? _face_texture_ids = null, Vector3? _collider_position = null, Vector3? _collider_min = null, Vector3? _collider_max = null)
         {
             Name = _name;
             Exists = _exists;
             NonSolid = _nonsolid;
             Translucent = _translucent;
+            BlockModel = _blockmodel;
+
             durability = _durability;
 
             if (_face_texture_ids == null)
             {
-                _face_texture_ids = new BlockFaces("Assets/Textures/missing.png");
+                _face_texture_ids = new BlockFaces<string>("Assets/Textures/missing.png");
             }
             FaceTextureIds = _face_texture_ids;
             if (_collider_position == null) {
