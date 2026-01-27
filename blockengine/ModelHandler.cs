@@ -31,7 +31,7 @@ namespace blockengine
                 foreach (string line in lines)
                 {
                     string[] parts = line.Split(" ");
-                    Console.WriteLine(line);
+                    //Console.WriteLine(line);
                     switch (parts[0])
                     {
                         case "v": //POSITION
@@ -58,11 +58,28 @@ namespace blockengine
 
                             
                             break;
+
+                        case "f": //FACE
+                            for (int i = 1; i<=3; i++)
+                            {
+                                string vertex = parts[i];
+                                Console.WriteLine(vertex);
+                                string[] vertex_parts = vertex.Split("/");
+                                
+                                //Console.WriteLine(vertex_parts[0] + "/" + vertex_parts[1] + "/" + vertex_parts[2]);
+
+                                int v = int.Parse(vertex_parts[0])-1;
+                                int vt = int.Parse(vertex_parts[1])-1;
+                                int vn = int.Parse(vertex_parts[2])-1;
+
+                                parsed.AddFace(new Int3(v, vt, vn));
+                            }
+                            break;
                     }
                 }
 
                 models[modeldir] = parsed;
-                Console.WriteLine("Parsed: " + modeldir + " (" + parsed.vertex_positions.Count.ToString() + ")");
+                Console.WriteLine("Parsed: " + modeldir + " (" + parsed.face_count + ")");
             }
         }
     }

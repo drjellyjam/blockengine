@@ -59,19 +59,22 @@ namespace blockengine
 
         public void AddParsedOBJ(BlockModel blockmodel, Vector3 center_pos, Vector3 vertex_offset, Vector3 scale)
         {
-            Console.WriteLine("Adding Parsed OBJ");
+            //Console.WriteLine("Adding Parsed OBJ");
             ParsedOBJ? obj = ModelHandler.GetModel(blockmodel.model_file);
             if (obj != null)
             {
                 UV tex_uv = TextureHandler.GetTextureUV(blockmodel.model_texture);
-                var _size = obj.vertex_normals.Count;
-
+                var _size = obj.face_count;
+                //Console.WriteLine(_size);
                 for (int i = 0; i < _size; i++)
                 {
                     var vertex = obj.GetVertex(i);
 
-                    var uv = new Vector2((vertex.uv.X * (tex_uv.XMAX - tex_uv.XMIN)) + tex_uv.XMIN, (vertex.uv.Y * (tex_uv.YMAX - tex_uv.YMIN)) + tex_uv.YMIN);
-                    AddVertex((vertex.position * scale) + center_pos + vertex_offset, vertex.normal, uv, Color.White);
+                    var uv = new Vector2(
+                        Raymath.Lerp(tex_uv.XMIN, tex_uv.XMAX, vertex.UV.X),
+                        Raymath.Lerp(tex_uv.YMIN, tex_uv.YMAX, vertex.UV.Y)
+                    );
+                    AddVertex((vertex.Position * scale) + center_pos + vertex_offset, vertex.Normal, uv, Color.White);
                 }
             }
         }
@@ -93,37 +96,31 @@ namespace blockengine
             }
         }
 
-        public void AddBlockFace(Vector3 cbp_v,BlockDefinition blockdef,Int3 normal,bool _flipped = false)
+        public void AddBlockFace(Vector3 cbp_v,Block blockdef, Int3 normal,bool _flipped = false)
         {
-            var _flip = 1;
-            if (_flipped)
-            {
-                _flip = -1;
-            }
-
             if (normal == Globals.block_normals[5])
             {
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Top);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Bottom);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
             }
             else if (normal == Globals.block_normals[4])
@@ -131,24 +128,24 @@ namespace blockengine
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Bottom);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, -1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Top);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                     
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
                 }
             }
             else if (normal == Globals.block_normals[2])
@@ -156,24 +153,24 @@ namespace blockengine
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Forward);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Backward);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
             }
             else if (normal == Globals.block_normals[3])
@@ -181,24 +178,24 @@ namespace blockengine
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Backward);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, -1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, -1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Forward);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(0, 1, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
             }
             else if (normal == Globals.block_normals[1])
@@ -206,24 +203,24 @@ namespace blockengine
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Right);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Left);
-                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(1, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(1, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
             }
             else if (normal == Globals.block_normals[0])
@@ -231,24 +228,24 @@ namespace blockengine
                 if (!_flipped)
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Left);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(-1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
                 }
                 else
                 {
                     UV bUv = blockdef.GetBlockUV(BlockFace.Right);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMIN), Color.White, blockdef.IsTranslucent());
 
-                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.Translucent);
-                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.Translucent);
+                    AddVertex(cbp_v + new Vector3(0, 1, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 0, 1), new Vector3(1, 0, 0), new Vector2(bUv.XMIN, bUv.YMAX), Color.White, blockdef.IsTranslucent());
+                    AddVertex(cbp_v + new Vector3(0, 1, 0), new Vector3(1, 0, 0), new Vector2(bUv.XMAX, bUv.YMIN), Color.White, blockdef.IsTranslucent());
                 }
             }
         }
@@ -268,15 +265,22 @@ namespace blockengine
                 DrawableT = false;
             }
         }
-        public bool GenerateMeshT()
+
+        public int GenerateMeshT()
         {
-            vertcountT = vertsT.Count();
+            if (normalsT.Count != vertsT.Count || uvsT.Count != vertsT.Count || vertcolorsT.Count != vertsT.Count)
+            {
+                Console.WriteLine("INCONSISTANT VERTEX DATA");
+                return 2;
+            }
+
+            vertcountT = vertsT.Count;
 
             if (vertcountT <= 2)
             {
                 Console.WriteLine("Not building empty mesh! (translucent)");
                 DrawableT = false;
-                return false;
+                return 1;
             }
 
             meshT.TriangleCount = vertcountT / 3;
@@ -299,17 +303,23 @@ namespace blockengine
 
             DrawableT = true;
 
-            return true;
+            return 0;
         }
-        public bool GenerateMesh()
+        public int GenerateMesh()
         {
-            vertcount = verts.Count();
+            if (normals.Count != verts.Count || uvs.Count != verts.Count || vertcolors.Count != verts.Count)
+            {
+                Console.WriteLine("INCONSISTANT VERTEX DATA");
+                return 2;
+            }
+
+            vertcount = verts.Count;
 
             if (vertcount <= 2)
             {
                 Console.WriteLine("Not building empty mesh!");
                 Drawable = false;
-                return false;
+                return 1;
             }
 
             mesh.TriangleCount = vertcount / 3;
@@ -332,7 +342,7 @@ namespace blockengine
 
             Drawable = true;
 
-            return true;
+            return 0;
         }
     }
 }

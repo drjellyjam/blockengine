@@ -8,6 +8,25 @@ using System.Numerics;
 
 namespace blockengine
 {
+    public class ChunkBlock
+    {
+        public float health;
+        public bool active;
+        public BlockType block;
+
+        public ChunkBlock(BlockType _block)
+        {
+            block = _block;
+            var _block_def = Globals.BlockDefinitions[block];
+            health = _block_def.GetDurability();
+            active = true;
+        }
+
+        public Block GetBlockDef()
+        {
+            return Globals.BlockDefinitions[block];
+        }
+    }
     public class Chunk
     {
         public Map3D map;
@@ -19,18 +38,22 @@ namespace blockengine
             //(chunkpos * Globals.chunk_size).Print();
             this.chunkpos = chunkpos;
             transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation((chunkpos * Globals.chunk_size).to_vector3()) * Matrix4x4.CreateScale(Globals.BlockScale));
-            map = new Map3D( Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, "GREY_STONE");
+            map = new Map3D(Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, BlockType.GreyStoneBlock);
             
             generator = new ChunkMeshGenerator();
         }
 
-        public bool UploadMeshes()
+        public int UploadMeshes()
         {
             generator.UnloadMesh();
-            bool b1 = generator.GenerateMesh();
-            bool b2 = generator.GenerateMeshT();
+            int b1 = generator.GenerateMesh();
+            int b2 = generator.GenerateMeshT();
 
-            return b1 || b2;
+            if (b1 == 2 || b2 == 2)
+            {
+                return 1;
+            }
+            return 0;
         }
         public void UnloadMesh()
         {

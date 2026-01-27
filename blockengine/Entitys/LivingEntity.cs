@@ -78,11 +78,11 @@ namespace blockengine.Entitys
                     for (int x = (int)Math.Floor(collider.Min.X - 1); x < (int)Math.Ceiling(collider.Max.X + 1); x++)
                     {
                         Int3 bp = new Int3((int)topos.X + x, (int)topos.Y + y, (int)topos.Z + z);
-                        Block? block = world.GetBlock(bp);
+                        ChunkBlock? block = world.GetBlock(bp);
                         if (block != null)
                         {
-                            BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
-                            if (blockdef.Exists && !blockdef.NonSolid)
+                            Block blockdef = block.GetBlockDef();
+                            if (blockdef.IsExists() && !blockdef.IsNonSolid())
                             {
                                 BoxCollider blockcollider = world.GetBlockCollider(bp);
                                 if (collider.CollidingWith(blockcollider))

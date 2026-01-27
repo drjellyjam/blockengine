@@ -9,7 +9,7 @@ namespace blockengine
 {
     public class Map3D
     {
-        Block[] map;
+        ChunkBlock[] map;
         public int width;
         public int height;
         public int depth;
@@ -19,23 +19,23 @@ namespace blockengine
 
         //Dictionary<string, int> trackers;
 
-        public Map3D(int _width, int _height, int _depth, string initial_value = "AIR")
+        public Map3D(int _width, int _height, int _depth, BlockType initial_block)
         {
             width = _width;
             height = _height;
             depth = _depth;
             fullsize = (_width * _height) * _depth;
-            map = new Block[fullsize];
+            map = new ChunkBlock[fullsize];
             //trackers = new Dictionary<string, int>();
 
             for (int i = 0; i < fullsize; i++)
             {
-                Block b = new Block(initial_value);
-                if (!b.GetDefinition().Exists)
+                Block b = Globals.BlockDefinitions[initial_block];
+                if (!b.IsExists())
                 {
                     air++;
                 }
-                map[i] = b;
+                map[i] = new ChunkBlock(initial_block);
             }
         }
 
@@ -68,7 +68,7 @@ namespace blockengine
         {
             return (pos.x < 0 || pos.x > width - 1 || pos.y < 0 || pos.y > height - 1 || pos.z < 0 || pos.z > depth - 1);
         }
-        public Block? Get(Int3 pos)
+        public ChunkBlock? Get(Int3 pos)
         {
             if (!OutOfBounds(pos))
             {
@@ -76,30 +76,30 @@ namespace blockengine
             }
             return null;
         }
-        public bool Set(Int3 pos, string set_definition)
+        public bool Set(Int3 pos, BlockType newblock)
         {
             if (!OutOfBounds(pos))
             {
                 int idx = PositionToIndex(pos);
-                Block prev = map[idx];
+                ChunkBlock prev = map[idx];
+                Block prev_def = prev.GetBlockDef();
+                Block next_def = Globals.BlockDefinitions[newblock];
 
-                if (set_definition == prev.definition_ID)
+                if (newblock == prev.block)
                 {
                     return false;
                 }
 
-                BlockDefinition next = Globals.BlockDefinitions[set_definition];
-                
-                if (!prev.GetDefinition().Exists && next.Exists)
+                if (!prev_def.IsExists() && next_def.IsExists())
                 {
                     air--;
                 }
-                else if (prev.GetDefinition().Exists && !next.Exists)
+                else if (prev_def.IsExists() && !next_def.IsExists())
                 {
                     air++;
                 }
 
-                map[idx].SetDefinition(set_definition);
+                map[idx] = new ChunkBlock(newblock);
                 return true;
             }
             return false;

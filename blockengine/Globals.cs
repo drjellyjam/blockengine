@@ -12,17 +12,18 @@ namespace blockengine
     {
         public static Int3 chunk_size = new Int3(16,16,16);
         public static float BlockScale = 1f;
-        public static Dictionary<string, BlockDefinition> BlockDefinitions = new Dictionary<string, BlockDefinition>()
+        public static Dictionary<BlockType, Block> BlockDefinitions = new Dictionary<BlockType, Block>()
         {
             //["null"] = null, /// the void
-            ["AIR"] = new BlockDefinition("Air",false),
+            [BlockType.ErrorBlock] = new ErrorBlock(),//new BlockDefinition(ErrorBlock, "Error",true,true,false,1,null,new BlockFaces<string>("Assets/Textures/missing.png")),
+            [BlockType.AirBlock] = new AirBlock(),
             //[1] = new BlockDefinition("Grass", true, false, false, new BlockFaces("Assets/Textures/grassblock_top.png", "Assets/Textures/dirt.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png")),
-            ["GREY_STONE"] = new BlockDefinition("Grey Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone.png")),
-            ["BROWN_STONE"] = new BlockDefinition("Brown Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/brownstone.png")),
-            ["BLUE_ORE"] = new BlockDefinition("Blue Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_blueore.png")),
-            ["WHITE_ORE"] = new BlockDefinition("White Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_whiteore.png")),
-            ["PROTO_GLASS"] = new BlockDefinition("Proto Glass",true,false,true,1,null,new BlockFaces<string>("Assets/Textures/proto_glass.png")),
-            ["MINE"] = new BlockDefinition("Mine",true,false,true,1,new BlockModel("Assets/Models/block.obj", "Assets/Textures/greystone.png",new BlockFaces<bool>(true)))
+            [BlockType.GreyStoneBlock] = new GreyStoneBlock(),//new BlockDefinition(new GreyStoneBlock(), "Grey Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone.png")),
+            [BlockType.BrownStoneBlock] = new BrownStoneBlock(),//new BlockDefinition(new BrownStoneBlock(), "Brown Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/brownstone.png")),
+            //["BLUE_ORE"] = new BlockDefinition("Blue Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_blueore.png")),
+            //["WHITE_ORE"] = new BlockDefinition("White Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_whiteore.png")),
+            //["PROTO_GLASS"] = new BlockDefinition("Proto Glass",true,false,true,1,null,new BlockFaces<string>("Assets/Textures/proto_glass.png")),
+            [BlockType.MineBlock] = new MineBlock(),//new BlockDefinition(new MineBlock(), "Mine", true, false, true, 1, new BlockModel("Assets/Models/mine.obj", "Assets/Textures/mine.png", Vector3.One * 0.4f, Vector3.Zero, new BlockFaces<bool>(true)))
             //[3] = new BlockDefinition("Dirt", true, false, false, new BlockFaces("Assets/Textures/dirt.png")),
             //[4] = new BlockDefinition("Log", true, false, false, new BlockFaces("Assets/Textures/log_top.png", "Assets/Textures/log_top.png", "Assets/Textures/log_side.png"))
         };

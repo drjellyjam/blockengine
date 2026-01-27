@@ -1,8 +1,8 @@
 whenever you work on this again heres a todo list.
 
-Remake chunk building system to fix seams
-  |___ Model blocks
-    |___ Functional blocks (chests, mines, tech)
+(X) Remake chunk building system to fix seams
+  |___ (X) Model blocks
+    |___ (X) Functional blocks (chests, mines, tech)
 
 Gui system
   |___ Inventory system
@@ -15,5 +15,8 @@ Flexible world generation system
   |___ Structures
   |___ biomes
   |___ Ores
+   
+Faster Entity Updating
+  |___ Fast Entity on Entity Collision
 
 Particle system

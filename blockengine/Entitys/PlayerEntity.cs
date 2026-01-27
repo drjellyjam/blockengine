@@ -18,7 +18,7 @@ namespace blockengine.Entitys
         private float gravity = 0.25f;
         private float mousesensitivity = 30f;
         private float spd = 4f;
-        private string block_to_place = "MINE";
+        private BlockType block_to_place = BlockType.BrownStoneBlock;
         public PlayerEntity(World _world, string _Name, Vector3 _position) : base(_world, _Name, _position)
         {
             max_health = 100;
@@ -35,14 +35,7 @@ namespace blockengine.Entitys
 
             Raylib.DisableCursor();
         }
-        public override void End()
-        {
 
-        }
-        public override void Tick()
-        {
-
-        }
         public override void Update(float deltatime)
         {
             UpdateCamera(deltatime);
@@ -72,7 +65,7 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(world.cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    world.SetBlock(result.BlockPosition, "AIR");
+                    world.BreakBlock(result.BlockPosition);
                 }
             }
 
@@ -81,14 +74,14 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(world.cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    BlockDefinition? blockplacedefinition = Globals.BlockDefinitions[block_to_place];
+                    Block? blockplacedefinition = Globals.BlockDefinitions[block_to_place];
                     if (blockplacedefinition != null)
                     {
-                        BoxCollider placecollider = blockplacedefinition.Collider;
+                        BoxCollider placecollider = blockplacedefinition.collider;
                         placecollider.Position = (result.BlockPosition + result.Normal).to_vector3() + (Vector3.One * 0.5f);
                         if (!placecollider.CollidingWith(collider))
                         {
-                            world.SetBlock(result.BlockPosition + result.Normal, block_to_place);
+                            world.PlaceBlock(result.BlockPosition + result.Normal, BlockType.MineBlock);
                         }
                     }
                 }
@@ -104,10 +97,6 @@ namespace blockengine.Entitys
                 Raylib.DrawCubeWiresV(result.BlockPosition.to_vector3() + (Vector3.One * 0.5f), result.Collider.Size * 1.05f, Color.White);
                 Raylib.DrawSphere(result.Hit, 0.01f, Color.White);
             }
-        }
-        public override void DrawGui()
-        {
-
         }
         
         //player entity spesific

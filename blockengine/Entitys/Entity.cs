@@ -25,11 +25,11 @@ namespace blockengine.Entitys
         {
             return Id;
         }
-        public abstract void DrawGui();
-        public abstract void Draw(); // on draw
-        public abstract void Tick(); // on world tick
-        public abstract void Update(float deltatime); // on frame
-        public abstract void Start(); // on entity spawn
-        public abstract void End();
+        public virtual void DrawGui() { }
+        public virtual void Draw() { } // on draw
+        public virtual void Tick() { } // on world tick
+        public virtual void Update(float deltatime) { } // on frame
+        public virtual void Start() { } // on entity spawn
+        public virtual void End() { }
     }
 }

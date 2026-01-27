@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace blockengine.Entitys
 {
+    /*
     public class Player
     {
         public Vector3 Velocity;
@@ -77,11 +78,11 @@ namespace blockengine.Entitys
                     for (int x = (int)Math.Floor(collider.Min.X - 1); x < (int)Math.Ceiling(collider.Max.X + 1); x++)
                     {
                         Int3 bp = new Int3( (int)topos.X + x, (int)topos.Y + y, (int)topos.Z + z);
-                        Block? block = world.GetBlock(bp);
+                        BlockType? block = world.GetBlock(bp);
                         if (block != null)
                         {
-                            BlockDefinition? blockdef = Globals.BlockDefinitions[block.definition_ID];
-                            if (blockdef.Exists && !blockdef.NonSolid)
+                            Block? blockdef = Globals.BlockDefinitions[(BlockType)block];
+                            if (blockdef.IsExists() && !blockdef.IsNonSolid())
                             {
                                 BoxCollider blockcollider = world.GetBlockCollider(bp);
                                 if (collider.CollidingWith(blockcollider))
@@ -217,7 +218,7 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    world.SetBlock(result.BlockPosition, "AIR");
+                    world.SetBlock(result.BlockPosition, new AirBlock());
                 }
             }
 
@@ -233,7 +234,7 @@ namespace blockengine.Entitys
                         placecollider.Position = (result.BlockPosition + result.Normal).to_vector3() + (Vector3.One * 0.5f);
                         if (!placecollider.CollidingWith(collider))
                         {
-                            world.SetBlock(result.BlockPosition + result.Normal, block_to_place);
+                            world.SetBlock(result.BlockPosition + result.Normal, new AirBlock());
                         }
                     }
                 }
@@ -252,4 +253,5 @@ namespace blockengine.Entitys
             }
         }
     }
+    */
 }

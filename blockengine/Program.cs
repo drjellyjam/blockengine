@@ -61,7 +61,7 @@ class Program
         
         world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
 
-        float max_frames = 0.05f;
+        float max_frames = 0.1f;
         float bi = max_frames;
 
         ModelHandler.LoadModels();

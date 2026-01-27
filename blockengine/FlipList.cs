@@ -29,8 +29,8 @@ namespace blockengine
 
         public List<T> GetInactiveList()
         {
-            if (active) { return list2; }
-            return list1;
+            if (!active) { return list1; }
+            return list2;
         }
 
         public void Flip()
@@ -39,6 +39,7 @@ namespace blockengine
         }
 
         public void Add(T item) {
+            if (active) { Console.WriteLine("LIST1"); } else { Console.WriteLine("LIST2"); }
             var _list = GetActiveList();
             if (allow_duplicates || !_list.Contains(item))
             {
