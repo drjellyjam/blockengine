@@ -55,24 +55,29 @@ class Program
             Directory.CreateDirectory("Saves");
         }
 
+        Raylib.SetTraceLogLevel(TraceLogLevel.Error);
         Raylib.InitWindow(1280, 720, "Block Engine");
+        Raylib.SetTargetFPS(120);
 
         World world = new World(new WorldInfo("test world",67));
         
         world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
 
         float max_frames = 0.1f;
-        float bi = max_frames;
-
+        float bi = max_frames*2;
+ 
         ModelHandler.LoadModels();
         TextureHandler.CreateAtlasTextures();
 
         
         Task.Run(() =>
         {
-           world.GenerateArea();
+            while (!Raylib.WindowShouldClose())
+            {
+                world.GenerateArea();
+            }
         });
-        
+
 
         while (!Raylib.WindowShouldClose())
         {
@@ -118,6 +123,7 @@ class Program
             //ui
 
             Raylib.DrawFPS(10, 10);
+            world.DrawDebugGUI();
 
             //Raylib.DrawTexture(TextureHandler.block_atlas.Texture, 0, 0, Color.Red);
 

@@ -1,4 +1,5 @@
-﻿using Raylib_cs;
+﻿using blockengine.Entitys;
+using Raylib_cs;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -92,6 +93,10 @@ namespace blockengine
             }
         }
 
+        public virtual void OnBlockBreak(World world,Int3 WBP)
+        {
+            world.AddEntity(new DroppedItemEntity(world, "DroppedItem", WBP.to_vector3() + (Vector3.One * 0.5f)));
+        }
         public virtual void OnNearBlockChanged(World world,Int3 WBP, BlockType changed_block_type,Int3 changed_WBP) //A block around this one was placed or removed
         {
 

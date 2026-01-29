@@ -23,14 +23,14 @@ namespace blockengine
 
         public List<T> GetActiveList()
         {
-            if (active) { return list1; }
-            return list2;
+            if (active) { return list2; }
+            return list1;
         }
 
         public List<T> GetInactiveList()
         {
-            if (!active) { return list1; }
-            return list2;
+            if (!active) { return list2; }
+            return list1;
         }
 
         public void Flip()
@@ -39,12 +39,17 @@ namespace blockengine
         }
 
         public void Add(T item) {
-            if (active) { Console.WriteLine("LIST1"); } else { Console.WriteLine("LIST2"); }
+            //if (active) { Console.WriteLine("LIST1"); } else { Console.WriteLine("LIST2"); }
             var _list = GetActiveList();
             if (allow_duplicates || !_list.Contains(item))
             {
                 _list.Add(item);
             }
+        }
+
+        public bool Has(T item)
+        {
+            return list1.Contains(item) || list2.Contains(item);
         }
 
         public void Clear()

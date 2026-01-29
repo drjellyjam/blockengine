@@ -250,7 +250,7 @@ namespace blockengine
             }
         }
 
-        public void UnloadMesh()
+        public void UnloadMeshes()
         {
             if (Drawable)
             {
@@ -266,9 +266,26 @@ namespace blockengine
             }
         }
 
+        public int UploadMeshes()
+        {
+
+            //Console.WriteLine("vertex: " + verts.Count + "/" + vertsT.Count);
+            //Console.WriteLine("normal: " + normals.Count + "/" + normalsT.Count);
+            //Console.WriteLine("uvs: " + uvs.Count + "/" + uvsT.Count);
+            //Console.WriteLine("vcolors: " + vertcolors.Count + "/" + vertcolorsT.Count);
+
+            int b1 = GenerateMesh();
+            int b2 = GenerateMeshT();
+
+            if (b1 == 2 || b2 == 2)
+            {
+                return 1;
+            }
+            return 0;
+        }
         public int GenerateMeshT()
         {
-            if (normalsT.Count != vertsT.Count || uvsT.Count != vertsT.Count || vertcolorsT.Count != vertsT.Count)
+            if (!(vertsT.Count == normalsT.Count && normalsT.Count == uvsT.Count && uvsT.Count == vertcolorsT.Count && vertcolorsT.Count == vertsT.Count))
             {
                 Console.WriteLine("INCONSISTANT VERTEX DATA");
                 return 2;
@@ -278,9 +295,16 @@ namespace blockengine
 
             if (vertcountT <= 2)
             {
-                Console.WriteLine("Not building empty mesh! (translucent)");
+                //Console.WriteLine("Not building empty mesh! (translucent)");
                 DrawableT = false;
                 return 1;
+            }
+
+            if (DrawableT)
+            {
+                Raylib.UnloadMesh(meshT);
+                meshT.VaoId = 0;
+                DrawableT = false;
             }
 
             meshT.TriangleCount = vertcountT / 3;
@@ -307,7 +331,7 @@ namespace blockengine
         }
         public int GenerateMesh()
         {
-            if (normals.Count != verts.Count || uvs.Count != verts.Count || vertcolors.Count != verts.Count)
+            if (!(verts.Count == normals.Count && normals.Count == uvs.Count && uvs.Count == vertcolors.Count && vertcolors.Count == verts.Count))
             {
                 Console.WriteLine("INCONSISTANT VERTEX DATA");
                 return 2;
@@ -317,9 +341,16 @@ namespace blockengine
 
             if (vertcount <= 2)
             {
-                Console.WriteLine("Not building empty mesh!");
+                //Console.WriteLine("Not building empty mesh!");
                 Drawable = false;
                 return 1;
+            }
+
+            if (Drawable)
+            {
+                Raylib.UnloadMesh(mesh);
+                mesh.VaoId = 0;
+                Drawable = false;
             }
 
             mesh.TriangleCount = vertcount / 3;

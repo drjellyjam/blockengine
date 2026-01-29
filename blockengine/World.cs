@@ -15,14 +15,22 @@ using System.Reflection.Metadata;
 
 namespace blockengine
 {
-    public struct WorldInfo
+    public enum WorldType : int
+    {
+        WorldType_normal,
+        WorldType_flat,
+        WorldType_void
+    }
+    public struct WorldInfo 
     {
         public string world_name;
         public int world_seed;
-        public WorldInfo(string _name = "Untitled_world", int _seed = 4206721)
+        public WorldType world_type;
+        public WorldInfo(string _name = "Untitled_world", int _seed = 4206721, WorldType _type = WorldType.WorldType_normal)
         {
             world_name = _name;
             world_seed = _seed;
+            world_type = _type;
         }
     }
     public class World
@@ -33,6 +41,7 @@ namespace blockengine
         private Int3 last_player_chunk_position;
 
         private Dictionary<Int3, Chunk> chunks;
+        private FlipList<Int3> chunk_unload_list;
         private FlipList<Int3> chunk_upload_list;
 
         private Dictionary<string, Entity> entities;
@@ -40,11 +49,7 @@ namespace blockengine
         private string focused_entity_id = "-1";
 
         private FastNoiseLite fnl;
-        
-        private AutoResetEvent upload_wait = new AutoResetEvent(false);
-        private bool upload_running = false;
 
-        private AutoResetEvent blockchange_wait = new AutoResetEvent(false);
         private bool blocks_changing = false;
         private int block_changes_being_made = 0;
         private List<Int3> blocks_changed_chunks;
@@ -54,6 +59,9 @@ namespace blockengine
         Material chunk_material;
         int shader_uniform_texture_pos;
         int shader_uniform_camera_pos_pos;
+        int render_distance = 2;
+        int entities_updated = 0;
+        int entities_updated_per_frame = 120;
 
         //Texture2D shadtex;
         public World(WorldInfo world_info)
@@ -75,7 +83,8 @@ namespace blockengine
 
             chunks = new Dictionary<Int3, Chunk>();
             chunk_upload_list = new FlipList<Int3>(false);
-
+            chunk_unload_list = new FlipList<Int3>(false);
+            
             blocks_changed_chunks = new List<Int3>();
 
             cam = new Camera3D();
@@ -139,14 +148,24 @@ namespace blockengine
             {
                 var _focused_entity = entities[focused_entity_id];
                 _focused_entity.Update(deltatime);
+                entities_updated += 1;
             }
 
-            foreach (Entity entity in entities.Values)
+            for (int i = entities_updated; i < entities_updated + entities_updated_per_frame; i++)
             {
+                if (i >= entities.Count)
+                {
+
+                    entities_updated = 0;
+                    break;
+                }
+
+                var entity = entities[entities.ElementAt(i).Key];
                 if (entity.GetID() != focused_entity_id)
                 {
                     entity.Update(deltatime);
                 }
+                entities_updated += 1;
             }
 
             //destroy garbage
@@ -324,9 +343,11 @@ namespace blockengine
 
         public Chunk? GetChunk(Int3 chunk_pos)
         {
-            Chunk? _val = null;
-            chunks.TryGetValue(chunk_pos, out _val);
-            return _val;
+            if (chunks.ContainsKey(chunk_pos) && !chunk_unload_list.Has(chunk_pos))
+            {
+                return chunks[chunk_pos];
+            }
+            return null;
         }
 
         public ChunkBlock? GetBlock(Int3 world_block_pos)
@@ -353,6 +374,15 @@ namespace blockengine
             block_changes_being_made -= 1;
             if (block_changes_being_made <= 0)
             {
+                Console.WriteLine("Commiting block changes");
+                foreach (Int3 chunkpos in blocks_changed_chunks)
+                {
+                    chunks[chunkpos].needs_rebuilt = true;
+                }
+                block_changes_being_made = 0;
+                blocks_changed_chunks.Clear();
+                blocks_changing = false;
+                /*
                 Task.Run(() =>
                 {
                     foreach (Int3 chunkpos in blocks_changed_chunks)
@@ -364,6 +394,7 @@ namespace blockengine
                     blocks_changed_chunks.Clear();
                     blocks_changing = false;
                 });
+                */
             }
         }
 
@@ -395,7 +426,15 @@ namespace blockengine
                 {
                     if (newblock == BlockType.AirBlock)
                     {
-                        AddEntity(new DroppedItemEntity(this, "DroppedItem", world_block_pos.to_vector3() + (Vector3.One * 0.5f) + new Vector3(Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f)));
+                        if (preform_block_updates)
+                        {
+                            ChunkBlock? b = chunk.map.Get(blockpos);
+                            if (b != null)
+                            {
+                                b.GetBlockDef().OnBlockBreak(this, world_block_pos);
+                            }
+                        }
+                        //AddEntity(new DroppedItemEntity(this, "DroppedItem", world_block_pos.to_vector3() + (Vector3.One * 0.5f) + new Vector3(Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f)));
                     }
 
                     BlockChangeAddChunk(chunkpos);
@@ -463,15 +502,28 @@ namespace blockengine
             }
 
             chunks.Add( chunk_pos, new Chunk(chunk_pos) );
+            ChunkGenerate(chunk_pos);
 
             return true;
         }
 
-        public void ChunkBuildMesh(Int3 chunk_pos,bool _frominside = false)
+        public void ChunkRemove(Int3 chunk_pos)
         {
             Chunk? chunk = GetChunk(chunk_pos);
             if (chunk != null)
             {
+                chunk.UnloadMeshes();
+                chunks.Remove(chunk_pos);
+            }
+        }
+
+        public int ChunkBuildMesh(Int3 chunk_pos,bool _frominside = false)
+        {
+            Chunk? chunk = GetChunk(chunk_pos);
+            if (chunk != null && (chunk.needs_rebuilt || (chunk.WillBuild() && !chunk.first_built)))
+            {
+                chunk.needs_rebuilt = false;
+
                 chunk.generator.Clear();
                 for (int idx = 0; idx < chunk.map.fullsize; idx++)
                 {
@@ -480,7 +532,7 @@ namespace blockengine
                     var CBP_v = CBP.to_vector3();
 
                     ChunkBlock? block = GetBlock(WBP);
-                    if (block == null) { return; }
+                    if (block == null) { return 2; }
                     Block block_def = block.GetBlockDef();
 
                     if (!block_def.IsExists() || block_def.IsTranslucent())
@@ -508,12 +560,12 @@ namespace blockengine
                             var at_WBP = WBP + norm;
 
                             ChunkBlock? at_block = GetBlock(at_WBP);
-                            if (at_block == null) { return; }
+                            if (at_block == null) { return 3; }
                             Block at_block_def = at_block.GetBlockDef();
 
                             if (at_block_def.IsExists())
                             {
-                                if (block != at_block)
+                                if (block.block != at_block.block)
                                 {
                                     if ((!block_def.IsTranslucent() && at_block_def.BlockModel == null) || (block_def.IsTranslucent() && !enclosed))
                                     {
@@ -531,22 +583,37 @@ namespace blockengine
                     }
                 }
 
-                if (upload_running && !_frominside)
-                {
-                    upload_wait.WaitOne();
-                }
+                //if (upload_running && !_frominside)
+                //{
+                //    //upload_wait.WaitOne();
+                //}
+
+                chunk.first_built = true;
+                
 
                 chunk_upload_list.Add(chunk_pos);
+                return 1;
             }
-            
+            return 0;
         }
 
         public void GenerateArea()
         {
-            var size = 3;
-            var buildsize = size - 1;
+            Entity? player = GetFocusEntity();
+            if (player != null)
+            {
+                last_player_chunk_position = Globals.WorldPosToChunkPos(player.Position);
+            }
 
-            Console.WriteLine("GENERATING...");
+            var size = render_distance;
+            var build_size = size - 1;
+            var unoad_size = size + 2;
+
+            Stopwatch stop = new Stopwatch();
+            stop.Start();
+
+            var generated_chunks = 0;
+            var built_chunks = 0;
 
             for (int x = -size; x<=size; x++)
             {
@@ -554,41 +621,64 @@ namespace blockengine
                 {
                     for (int z = -size; z <=size; z++)
                     {
-                        var pos = new Int3(x, y, z);
-                        bool created = ChunkCreate(pos);
-                        if (created)
+                        var pos = last_player_chunk_position + new Int3(x, y, z);
+                        bool generated = ChunkCreate(pos);
+                        //Console.WriteLine(generated);
+                        if (generated)
                         {
-                            ChunkGenerate(pos);
+                            generated_chunks += 1;
                         }
-                    }
+                    } 
                 }
             }
 
-            Console.WriteLine("BUILDING...");
-
-            for (int x = -buildsize; x <= buildsize; x++)
+            for (int x = -build_size; x <= build_size; x++)
             {
-                for (int y = -buildsize; y <= buildsize; y++)
+                for (int y = -build_size; y <= build_size; y++)
                 {
-                    for (int z = -buildsize; z <= buildsize; z++)
+                    for (int z = -build_size; z <= build_size; z++)
                     {
-                        var pos = new Int3(x, y, z);
-                        Chunk? chunk = GetChunk(pos);
-                        if (chunk != null && chunk.WillBuild())
+                        Int3 pos = last_player_chunk_position + new Int3(x,y,z);
+                        Chunk chunk = chunks[pos];
+                        int built = ChunkBuildMesh(pos);
+                        if (built == 1)
                         {
-                            ChunkBuildMesh(pos);
+                            built_chunks += 1;
+                        }
+                        else
+                        {
+                            if (built > 1)
+                            {
+                                Console.WriteLine("BUILD FAILED : " + built);
+                            }
                         }
                     }
                 }
             }
 
-            Console.WriteLine("Generation Cycle Finished!");
+            stop.Stop();
+            if (generated_chunks > 0 || built_chunks> 0)
+            {
+                Console.WriteLine(generated_chunks + "/" + built_chunks + "/" + stop.ElapsedMilliseconds);
+            }
+
+            
+            foreach (Int3 cpos in chunks.Keys)
+            {
+                if (cpos.x < last_player_chunk_position.x - unoad_size || cpos.x > last_player_chunk_position.x + unoad_size ||
+                    cpos.y < last_player_chunk_position.y - unoad_size || cpos.y > last_player_chunk_position.y + unoad_size ||
+                    cpos.z < last_player_chunk_position.z - unoad_size || cpos.z > last_player_chunk_position.z + unoad_size)
+                {
+                    chunk_unload_list.Add(cpos);
+                }
+            }
+            
+            //Console.WriteLine("Generation Cycle Finished!");
         }
 
         public void UploadChunks()
-        {
-            upload_running = true;
-            chunk_upload_list.Flip();
+        {  
+            //Console.WriteLine("Uploading chunks");
 
             List<Int3> upload_list = chunk_upload_list.GetInactiveList();
             var _amt = upload_list.Count;
@@ -602,19 +692,41 @@ namespace blockengine
                     int built = chunk.UploadMeshes();
                     if (built == 1) //inconsistant error code
                     {
-                        ChunkBuildMesh(chunk_pos,true);
+                        Console.WriteLine("ERROR UPLOADING CHUNK");
                     }
                 }
             }
             upload_list.Clear();
 
+            chunk_upload_list.Flip();
+
             if (_amt > 0)
             {
-                Console.WriteLine("Upload Cycle Finished (" + _amt.ToString() + ")");
+                //Console.WriteLine("Upload Cycle Finished (" + _amt.ToString() + ")");
             }
 
-            upload_wait.Set();
-            upload_running = false;
+            //unload
+
+            
+            //Console.WriteLine("Unloading chunks");
+
+            List<Int3> unload_list = chunk_unload_list.GetInactiveList();
+            var _unload_amt = unload_list.Count;
+
+            foreach (Int3 chunk_pos in unload_list)
+            {
+                ChunkRemove(chunk_pos);
+            }
+            unload_list.Clear();
+
+            chunk_unload_list.Flip();
+
+            if (_unload_amt > 0)
+            {
+                //Console.WriteLine("Unload Cycle Finished (" + _unload_amt.ToString() + ")");
+            }
+            
+
         }
 
         public void ChunkGenerate(Int3 chunk_pos)
@@ -628,33 +740,27 @@ namespace blockengine
                     var WBP = (chunk_pos * Globals.chunk_size) + CBP;
                     var v = BlockType.GreyStoneBlock;
 
-                    if (fnl.GetNoise(WBP.x, WBP.y, WBP.z) > 0.5f)
+                    if (WBP.z > -2)
                     {
                         v = BlockType.AirBlock;
-                    }
-                    else
-                    {
-                        if (Raylib.GetRandomValue(0,256)==256)
-                        {
-                            v = BlockType.MineBlock;
-                        }
                     }
 
                     chunk.map.Set(CBP, v);
                 }
+                //Console.WriteLine("Generated chunk");
             }
         }
         public void DrawAllChunks()
         {
             Raylib.SetShaderValueTexture(chunk_material.Shader, shader_uniform_texture_pos, TextureHandler.block_atlas.Texture);
-            var buildsize = 2;
+            var buildsize = render_distance;
             for (int x = -buildsize; x <= buildsize; x++)
             {
                 for (int y = -buildsize; y <= buildsize; y++)
                 {
                     for (int z = -buildsize; z <= buildsize; z++)
                     {
-                        var pos = new Int3(x, y, z);
+                        var pos = last_player_chunk_position + new Int3(x, y, z);
                         Chunk? chunk = GetChunk(pos);
                         if (chunk != null)
                         {
@@ -666,7 +772,7 @@ namespace blockengine
                             {
                                 Raylib.DrawMesh(chunk.generator.meshT, chunk_material, chunk.transform);
                             }
-                            Raylib.DrawCubeWires(pos.to_vector3() * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
+                            Raylib.DrawCubeWires((pos.to_vector3() + new Vector3(0.5f,0.5f,0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                         }
                     }
                 }
@@ -674,6 +780,13 @@ namespace blockengine
         }
 
         #endregion
+
+        public void DrawDebugGUI()
+        {
+            var _target = 7 * ((render_distance * 2) * (render_distance * 2) * (render_distance * 2));
+            Raylib.DrawText("Chunks Loaded: " + chunks.Count.ToString() + "/" + _target.ToString(), 32, 64, 25, Color.White);
+            Raylib.DrawText("Entities Loaded: " + entities.Count.ToString() + "/" + garbage_entities.Count.ToString(), 32, 64 + 32, 25, Color.White);
+        }
 
         public void Cleanup()
         {

@@ -26,8 +26,9 @@ namespace blockengine
             depth = _depth;
             fullsize = (_width * _height) * _depth;
             map = new ChunkBlock[fullsize];
+            //map.Initialize();
             //trackers = new Dictionary<string, int>();
-
+            
             for (int i = 0; i < fullsize; i++)
             {
                 Block b = Globals.BlockDefinitions[initial_block];
@@ -37,6 +38,7 @@ namespace blockengine
                 }
                 map[i] = new ChunkBlock(initial_block);
             }
+            
         }
 
         public byte[] too_bytes()
@@ -45,7 +47,7 @@ namespace blockengine
 
             for (int i = 0; i < fullsize; i++)
             {
-                bytes[i] = (byte)1; //map[i];
+                bytes[i] = (byte)map[i].block;
             }
 
             return bytes;
@@ -87,6 +89,7 @@ namespace blockengine
 
                 if (newblock == prev.block)
                 {
+                    changed = false;
                     return false;
                 }
 
@@ -100,6 +103,7 @@ namespace blockengine
                 }
 
                 map[idx] = new ChunkBlock(newblock);
+                changed = true;
                 return true;
             }
             return false;

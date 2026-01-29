@@ -60,6 +60,24 @@ namespace blockengine.Entitys
                 Velocity.Z = 12f;
             }
 
+            int scroll = (int)Raylib.GetMouseWheelMove();
+            if (scroll != 0)
+            {
+                scroll = Math.Sign(scroll);
+
+                block_to_place += scroll;
+                if (block_to_place >= BlockType.BlockCount)
+                {
+                    block_to_place = 0;
+                }
+                if (block_to_place < 0)
+                {
+                    block_to_place = BlockType.BlockCount - 1;
+                }
+
+                scroll = 0;
+            }
+
             if (Raylib.IsMouseButtonPressed(MouseButton.Left))
             {
                 RaycastResult? result = world.Raycast(world.cam.Position, GetCameraForward() * 8);
@@ -74,16 +92,7 @@ namespace blockengine.Entitys
                 RaycastResult? result = world.Raycast(world.cam.Position, GetCameraForward() * 8);
                 if (result != null)
                 {
-                    Block? blockplacedefinition = Globals.BlockDefinitions[block_to_place];
-                    if (blockplacedefinition != null)
-                    {
-                        BoxCollider placecollider = blockplacedefinition.collider;
-                        placecollider.Position = (result.BlockPosition + result.Normal).to_vector3() + (Vector3.One * 0.5f);
-                        if (!placecollider.CollidingWith(collider))
-                        {
-                            world.PlaceBlock(result.BlockPosition + result.Normal, BlockType.MineBlock);
-                        }
-                    }
+                    world.PlaceBlock(result.BlockPosition + result.Normal, block_to_place);
                 }
             }
 

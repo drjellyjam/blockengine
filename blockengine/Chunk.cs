@@ -33,8 +33,12 @@ namespace blockengine
         public ChunkMeshGenerator generator;
         public Matrix4x4 transform;
         public Int3 chunkpos;
+        public bool needs_rebuilt;
+        public bool first_built;
         public Chunk(Int3 chunkpos)
         {
+            needs_rebuilt = false;
+            first_built = false;
             //(chunkpos * Globals.chunk_size).Print();
             this.chunkpos = chunkpos;
             transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation((chunkpos * Globals.chunk_size).to_vector3()) * Matrix4x4.CreateScale(Globals.BlockScale));
@@ -42,22 +46,14 @@ namespace blockengine
             
             generator = new ChunkMeshGenerator();
         }
-
         public int UploadMeshes()
         {
-            generator.UnloadMesh();
-            int b1 = generator.GenerateMesh();
-            int b2 = generator.GenerateMeshT();
-
-            if (b1 == 2 || b2 == 2)
-            {
-                return 1;
-            }
-            return 0;
+            var b = generator.UploadMeshes();
+            return b;
         }
-        public void UnloadMesh()
+        public void UnloadMeshes()
         {
-            generator.UnloadMesh();
+            generator.UnloadMeshes();
         }
         public bool IsChanged()
         {
