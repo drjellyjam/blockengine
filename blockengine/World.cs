@@ -53,15 +53,25 @@ namespace blockengine
         private bool blocks_changing = false;
         private int block_changes_being_made = 0;
         private List<Int3> blocks_changed_chunks;
+        private FlipList<Int3> scheduled_tick_blocks;
 
+        private Random genrandom;
         public Camera3D cam;
 
         Material chunk_material;
         int shader_uniform_texture_pos;
         int shader_uniform_camera_pos_pos;
+        int shader_uniform_texture_emissive_pos;
+        int shader_uniform_fog_color;
+        int shader_uniform_fog_mult;
         int render_distance = 2;
         int entities_updated = 0;
         int entities_updated_per_frame = 120;
+        public Color fog_color = Color.Black;
+        private float[] fog_color_array = new float[3] {0.0f,0.0f,0.0f};
+
+        float tick = 1;
+        int ticks = 0;
 
         //Texture2D shadtex;
         public World(WorldInfo world_info)
@@ -70,9 +80,14 @@ namespace blockengine
             fnl = new FastNoiseLite(info.world_seed);
             fnl.SetFrequency(0.02f);
 
+            genrandom = new Random(info.world_seed);
+
             chunk_material = Raylib.LoadMaterialDefault();
             Shader shad = Raylib.LoadShader("Assets/Shaders/terrain_shader.vs", "Assets/Shaders/terrain_shader.fs");
             shader_uniform_texture_pos = Raylib.GetShaderLocation(shad, "atlastexture");
+            shader_uniform_texture_emissive_pos = Raylib.GetShaderLocation(shad, "atlastexture_emissive");
+            shader_uniform_fog_color = Raylib.GetShaderLocation(shad, "fog_color");
+            shader_uniform_fog_mult = Raylib.GetShaderLocation(shad, "fog_mult");
             shader_uniform_camera_pos_pos = Raylib.GetShaderLocation(shad, "camera_pos");
             chunk_material.Shader = shad;
 
@@ -84,7 +99,8 @@ namespace blockengine
             chunks = new Dictionary<Int3, Chunk>();
             chunk_upload_list = new FlipList<Int3>(false);
             chunk_unload_list = new FlipList<Int3>(false);
-            
+
+            scheduled_tick_blocks = new FlipList<Int3>(false);
             blocks_changed_chunks = new List<Int3>();
 
             cam = new Camera3D();
@@ -240,7 +256,7 @@ namespace blockengine
                 MathF.Sqrt(1 + (absDirX / absDirZ) * (absDirX / absDirZ) + (absDirY / absDirZ) * (absDirY / absDirZ))
             );
 
-            Vector3 MapCheck = new Vector3((int)RayStart.X, (int)RayStart.Y, (int)RayStart.Z);
+            Vector3 MapCheck = new Vector3((int)Math.Floor(RayStart.X), (int)Math.Floor(RayStart.Y), (int)Math.Floor(RayStart.Z));
             Vector3 RayLength1D;
             Vector3 Vstep;
 
@@ -343,7 +359,7 @@ namespace blockengine
 
         public Chunk? GetChunk(Int3 chunk_pos)
         {
-            if (chunks.ContainsKey(chunk_pos) && !chunk_unload_list.Has(chunk_pos))
+            if (chunks.ContainsKey(chunk_pos))
             {
                 return chunks[chunk_pos];
             }
@@ -374,7 +390,7 @@ namespace blockengine
             block_changes_being_made -= 1;
             if (block_changes_being_made <= 0)
             {
-                Console.WriteLine("Commiting block changes");
+                //Console.WriteLine("Commiting block changes");
                 foreach (Int3 chunkpos in blocks_changed_chunks)
                 {
                     chunks[chunkpos].needs_rebuilt = true;
@@ -424,17 +440,15 @@ namespace blockengine
 
                 if (chunk_was_changed)
                 {
-                    if (newblock == BlockType.AirBlock)
+                    scheduled_tick_blocks.Remove(world_block_pos);
+
+                    if (preform_block_updates)
                     {
-                        if (preform_block_updates)
+                        ChunkBlock? new_block = chunk.map.Get(blockpos);
+                        if (new_block != null)
                         {
-                            ChunkBlock? b = chunk.map.Get(blockpos);
-                            if (b != null)
-                            {
-                                b.GetBlockDef().OnBlockBreak(this, world_block_pos);
-                            }
+                            new_block.GetBlockDef().OnBlockInit(this, world_block_pos);
                         }
-                        //AddEntity(new DroppedItemEntity(this, "DroppedItem", world_block_pos.to_vector3() + (Vector3.One * 0.5f) + new Vector3(Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f, Raylib.GetRandomValue(-50, 50) / 100f)));
                     }
 
                     BlockChangeAddChunk(chunkpos);
@@ -453,13 +467,15 @@ namespace blockengine
                             if (at_block != null && at_block.active)
                             {
                                 Block block_def = at_block.GetBlockDef();
-                                block_def.OnNearBlockChanged(this, world_block_pos + norm, at_block.block, world_block_pos);
+                                block_def.OnNearBlockChanged(this, world_block_pos + norm, newblock, world_block_pos);
                             }
                         }
                     }
+
+                    return true;
                 }
 
-                return true;
+                
             }
             return false;
         }
@@ -489,6 +505,42 @@ namespace blockengine
             }
         }
 
+        public float GetBlockData(Int3 world_block_pos,string name)
+        {
+            ChunkBlock? block = GetBlock(world_block_pos);
+            if (block != null && block.HasBlockData(name))
+            {
+                return block.GetBlockData(name);
+            }
+            return 0;
+        }
+        public bool BlockHasData(Int3 world_block_pos, string name)
+        {
+            ChunkBlock? block = GetBlock(world_block_pos);
+            if (block != null)
+            {
+                return block.HasBlockData(name);
+            }
+            return false;
+        }
+        public void SetBlockData(Int3 world_block_pos, string name,float value)
+        {
+            ChunkBlock? block = GetBlock(world_block_pos);
+            if (block != null)
+            {
+                block.SetBlockData(name,value);
+            }
+        }
+
+        public void BlockRequestScheduledTick(Int3 world_block_pos)
+        {
+            ChunkBlock? block = GetBlock(world_block_pos);
+            if (block != null && block.active)
+            {
+                scheduled_tick_blocks.Add(world_block_pos);
+            }
+        }
+
         public bool ChunkExists(Int3 chunk_pos)
         {
             return chunks.ContainsKey(chunk_pos);
@@ -502,7 +554,7 @@ namespace blockengine
             }
 
             chunks.Add( chunk_pos, new Chunk(chunk_pos) );
-            ChunkGenerate(chunk_pos);
+            
 
             return true;
         }
@@ -520,9 +572,16 @@ namespace blockengine
         public int ChunkBuildMesh(Int3 chunk_pos,bool _frominside = false)
         {
             Chunk? chunk = GetChunk(chunk_pos);
-            if (chunk != null && (chunk.needs_rebuilt || (chunk.WillBuild() && !chunk.first_built)))
+            if (chunk != null && (chunk.needs_rebuilt || chunk.IsChanged() || (chunk.WillBuild() && !chunk.first_built)))
             {
+                chunk.map.changed = false;
                 chunk.needs_rebuilt = false;
+                chunk.first_built = true;
+
+                if (chunk.generator.is_generating)
+                {
+                    chunk.generator.done_generating_event.WaitOne();
+                }
 
                 chunk.generator.Clear();
                 for (int idx = 0; idx < chunk.map.fullsize; idx++)
@@ -555,8 +614,9 @@ namespace blockengine
                             }
                         }
 
-                        foreach (Int3 norm in Globals.block_normals)
+                        for (int ni = 0; ni<Globals.block_normals.Length; ni++)
                         {
+                            Int3 norm = Globals.block_normals[ni];
                             var at_WBP = WBP + norm;
 
                             ChunkBlock? at_block = GetBlock(at_WBP);
@@ -567,7 +627,7 @@ namespace blockengine
                             {
                                 if (block.block != at_block.block)
                                 {
-                                    if ((!block_def.IsTranslucent() && at_block_def.BlockModel == null) || (block_def.IsTranslucent() && !enclosed))
+                                    if ((!block_def.IsTranslucent() && at_block_def.BlockModel == null) || (block_def.IsTranslucent() && at_block_def.BlockModel == null && !enclosed))
                                     {
                                         chunk.generator.AddBlockFace(CBP_v, at_block_def, norm, true);
                                     }
@@ -588,7 +648,7 @@ namespace blockengine
                 //    //upload_wait.WaitOne();
                 //}
 
-                chunk.first_built = true;
+                
                 
 
                 chunk_upload_list.Add(chunk_pos);
@@ -597,11 +657,35 @@ namespace blockengine
             return 0;
         }
 
+        public void UpdateWorld()
+        {
+            UpdateEntities();
+            tick -= Raylib.GetFrameTime();
+            if (tick <= 0)
+            {
+                tick = 0.5f;
+                ticks += 1;
+                var list = scheduled_tick_blocks.GetInactiveList();
+                for (int i = 0; i < list.Count; i++)
+                {
+                    Int3 WBP = list[i];
+                    ChunkBlock? block = GetBlock(WBP);
+                    if (block != null)
+                    {
+                        block.GetBlockDef().OnScheduledTick(this, WBP);
+                    }
+                }
+                list.Clear();
+                scheduled_tick_blocks.Flip();
+            }
+        }
+
         public void GenerateArea()
         {
             Entity? player = GetFocusEntity();
             if (player != null)
             {
+                last_player_position = player.Position;
                 last_player_chunk_position = Globals.WorldPosToChunkPos(player.Position);
             }
 
@@ -609,58 +693,45 @@ namespace blockengine
             var build_size = size - 1;
             var unoad_size = size + 2;
 
-            Stopwatch stop = new Stopwatch();
-            stop.Start();
+            //Stopwatch stop = new Stopwatch();
+            //stop.Start();
 
-            var generated_chunks = 0;
-            var built_chunks = 0;
+            //var generated_chunks = 0;
+            //var built_chunks = 0;
 
-            for (int x = -size; x<=size; x++)
+            for (int i = 0; i<Globals.flood_draw_dist_low; i++)
             {
-                for (int y = -size; y <=size; y++)
+                Int3 floodpos = Globals.flood_positions[i];
+                var cp = last_player_chunk_position + floodpos;
+
+                bool created = ChunkCreate(cp);
+                if (created)
                 {
-                    for (int z = -size; z <=size; z++)
-                    {
-                        var pos = last_player_chunk_position + new Int3(x, y, z);
-                        bool generated = ChunkCreate(pos);
-                        //Console.WriteLine(generated);
-                        if (generated)
-                        {
-                            generated_chunks += 1;
-                        }
-                    } 
+                    ChunkGenerate_Shaping(cp);
                 }
-            }
-
-            for (int x = -build_size; x <= build_size; x++)
-            {
-                for (int y = -build_size; y <= build_size; y++)
+                for (int j = 0; j<Globals.block_normals.Length; j++)
                 {
-                    for (int z = -build_size; z <= build_size; z++)
+                    var npos = Globals.block_normals[j];
+                    bool ncreated = ChunkCreate(cp + npos);
+                    if (ncreated)
                     {
-                        Int3 pos = last_player_chunk_position + new Int3(x,y,z);
-                        Chunk chunk = chunks[pos];
-                        int built = ChunkBuildMesh(pos);
-                        if (built == 1)
-                        {
-                            built_chunks += 1;
-                        }
-                        else
-                        {
-                            if (built > 1)
-                            {
-                                Console.WriteLine("BUILD FAILED : " + built);
-                            }
-                        }
+                        ChunkGenerate_Shaping(cp + npos);
                     }
                 }
+                Chunk c = chunks[cp];
+                if (c.generation_stage != ChunkGenerationStage.Populated)
+                {
+                    ChunkGenerate_Population(cp);
+                }
+
+                ChunkBuildMesh(cp);
             }
 
-            stop.Stop();
-            if (generated_chunks > 0 || built_chunks> 0)
-            {
-                Console.WriteLine(generated_chunks + "/" + built_chunks + "/" + stop.ElapsedMilliseconds);
-            }
+            //stop.Stop();
+            //if (stop.ElapsedMilliseconds > 0)
+            //{
+                //Console.WriteLine(stop.ElapsedMilliseconds);
+            //}
 
             
             foreach (Int3 cpos in chunks.Keys)
@@ -729,30 +800,37 @@ namespace blockengine
 
         }
 
-        public void ChunkGenerate(Int3 chunk_pos)
+        
+        public void Draw()
         {
-            Chunk? chunk = GetChunk(chunk_pos);
-            if (chunk != null)
+            DrawEntities();
+
+            float fog_mult = 0;
+            if (render_distance == 3)
             {
-                for (int idx = 0; idx < chunk.map.fullsize; idx++)
-                {
-                    var CBP = chunk.map.IndexToPosition(idx);
-                    var WBP = (chunk_pos * Globals.chunk_size) + CBP;
-                    var v = BlockType.GreyStoneBlock;
-
-                    if (WBP.z > -2)
-                    {
-                        v = BlockType.AirBlock;
-                    }
-
-                    chunk.map.Set(CBP, v);
-                }
-                //Console.WriteLine("Generated chunk");
+                fog_mult = 0.03f;
             }
-        }
-        public void DrawAllChunks()
-        {
+            else if (render_distance == 4)
+            {
+                fog_mult = 0.015f;
+            }
+            else if(render_distance == 2)
+            {
+                fog_mult = 0.05f;
+            }
+            else if (render_distance == 1)
+            {
+                fog_mult = 0.075f;
+            }
+
+            Raylib.DrawCubeWires((last_player_chunk_position.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
+
+            Raylib.BeginShaderMode(chunk_material.Shader);
+            Raylib.DrawCube(Vector3.Zero, 1, 1, 1, Color.White);
+            Raylib.SetShaderValue(chunk_material.Shader, shader_uniform_fog_color, fog_color_array, ShaderUniformDataType.Vec3);
+            Raylib.SetShaderValue(chunk_material.Shader, shader_uniform_fog_mult, fog_mult, ShaderUniformDataType.Float);
             Raylib.SetShaderValueTexture(chunk_material.Shader, shader_uniform_texture_pos, TextureHandler.block_atlas.Texture);
+            Raylib.SetShaderValueTexture(chunk_material.Shader, shader_uniform_texture_emissive_pos, TextureHandler.block_atlas_emissive.Texture);
             var buildsize = render_distance;
             for (int x = -buildsize; x <= buildsize; x++)
             {
@@ -764,18 +842,178 @@ namespace blockengine
                         Chunk? chunk = GetChunk(pos);
                         if (chunk != null)
                         {
-                            if (chunk.generator.Drawable)
+                            if (Globals.CubeInView(cam.Position,cam.Target,chunk.GetCollider()))
                             {
-                                Raylib.DrawMesh(chunk.generator.mesh, chunk_material, chunk.transform);
+                                if (chunk.generator.Drawable)
+                                {
+                                    Raylib.DrawMesh(chunk.generator.mesh, chunk_material, chunk.transform);
+                                }
+                                
+                                //Raylib.DrawCubeWires((pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                             }
-                            if (chunk.generator.DrawableT)
-                            {
-                                Raylib.DrawMesh(chunk.generator.meshT, chunk_material, chunk.transform);
-                            }
-                            Raylib.DrawCubeWires((pos.to_vector3() + new Vector3(0.5f,0.5f,0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                         }
                     }
                 }
+            }
+            for (int x = -buildsize; x <= buildsize; x++)
+            {
+                for (int y = -buildsize; y <= buildsize; y++)
+                {
+                    for (int z = -buildsize; z <= buildsize; z++)
+                    {
+                        var pos = last_player_chunk_position + new Int3(x, y, z);
+                        Chunk? chunk = GetChunk(pos);
+                        if (chunk != null)
+                        {
+                            if (Globals.CubeInView(cam.Position, cam.Target, chunk.GetCollider()))
+                            {
+                                if (chunk.generator.DrawableT)
+                                {
+                                    Raylib.DrawMesh(chunk.generator.meshT, chunk_material, chunk.transform);
+                                }
+                                
+                            }
+                        }
+                    }
+                }
+            }
+            Raylib.EndShaderMode();
+        }
+
+        #endregion
+
+        #region CHUNK GENERATION
+
+        public List<Int3> GetStructureGeneratePositions(Int3 chunk_pos, Int3 offset, int random_mult = 0,int scale = 8)
+        {
+            List<Int3> positions = new List<Int3>();
+            var cp_wb = (chunk_pos * Globals.chunk_size) - Globals.chunk_size;
+            var cp_wb_mod = new Int3(Globals.better_modI(cp_wb.x + offset.x, scale), Globals.better_modI(cp_wb.y + offset.y, scale), Globals.better_modI(cp_wb.z + offset.z, scale));
+
+            var next_x = scale - cp_wb_mod.x;
+            var next_y = scale - cp_wb_mod.y;
+            var next_z = scale - cp_wb_mod.z;
+
+            var p_x = cp_wb;
+
+            for (int sx = -Globals.chunk_size.x; sx < Globals.chunk_size.x; sx++)
+            {
+                p_x.x += next_x;
+                next_x = scale;
+
+                var p_y = p_x;
+                
+                for (int sy = -Globals.chunk_size.y; sy < Globals.chunk_size.y; sy++)
+                {
+                    p_y.y += next_y;
+                    next_y = scale;
+
+                    var p_z = p_y;
+
+                    for (int sz = -Globals.chunk_size.z; sz < Globals.chunk_size.z; sz++)
+                    {
+                        p_z.z += next_z;
+                        next_z = scale;
+
+                        var ppp = new Int3(p_x.x, p_y.y, p_z.z);
+
+                        //var v2 = Globals.GetPseudoRandom(p_x.x);
+
+                        var p = ppp + new Int3(genrandom.Next(-random_mult, random_mult), genrandom.Next(-random_mult, random_mult), genrandom.Next(-random_mult, random_mult));
+
+                        if (p.x >= cp_wb.x && p.x <= cp_wb.x + Globals.chunk_size.x &&
+                            p.y >= cp_wb.y && p.y <= cp_wb.y + Globals.chunk_size.y &&
+                            p.z >= cp_wb.z && p.z <= cp_wb.z + Globals.chunk_size.z)
+                        {
+                            positions.Add(p);
+                        }
+                    }
+                }
+            }
+            return positions;
+        }
+        public void ChunkGenerate_Shaping(Int3 chunk_pos)
+        {
+            Chunk? chunk = GetChunk(chunk_pos);
+            if (chunk != null)
+            {
+                for (int idx = 0; idx < chunk.map.fullsize; idx++)
+                {
+                    var CBP = chunk.map.IndexToPosition(idx);
+                    var WBP = (chunk_pos * Globals.chunk_size) + CBP;
+                    var v = BlockType.GreyStoneBlock;
+
+                    /*
+                    
+                    if (WBP.z == -2 && WBP.x >= -1 && WBP.x <= 1 && WBP.y >= -1 && WBP.y <= 1)
+                    {
+                        v = BlockType.GreyStoneBlock;
+                    }
+                    */
+
+                    
+                    if (WBP.x > -5 && WBP.x < 5 && WBP.y > -5 && WBP.y < 5 && WBP.z > -5 && WBP.z < 5)
+                    {
+                        if (WBP.x == 4 || WBP.y == 4 || WBP.z == 4 || WBP.z == -4 || WBP.x == -4 || WBP.y == -4)
+                        {
+                            v = BlockType.ProtoGlassBlock;
+                        }
+                        else
+                        {
+                            v = BlockType.AirBlock;
+                        }
+                    }
+                    else
+                    {
+                        if (fnl.GetNoise(WBP.x, WBP.y, WBP.z) > 0.5)
+                        {
+                            v = BlockType.AirBlock;
+                        }
+                        else
+                        {
+                            var r = genrandom.Next(0, 512);
+                            if (r == 512)
+                            {
+                                v = BlockType.BlueOreBlock;
+                            }
+                            else if (r == 256)
+                            {
+                                v = BlockType.WhiteOreBlock;
+                            }
+                            else if (r == 128)
+                            {
+                                v = BlockType.MineBlock;
+                            }
+                        }
+                    }
+                    
+
+
+                    chunk.map.Set(CBP, v);
+                }
+                //Console.WriteLine("Generated chunk");
+
+                chunk.generation_stage = ChunkGenerationStage.Shaped;
+            }
+        }
+
+        public void ChunkGenerate_Population(Int3 chunk_pos)
+        {
+            Chunk? chunk = GetChunk(chunk_pos);
+            if (chunk != null)
+            {
+                List<Int3> structure_positions = GetStructureGeneratePositions(chunk_pos, new Int3(0,0,0), 1, 4);
+                for (int i = 0; i < structure_positions.Count; i++)
+                {
+                    Int3 structure_root_block_pos = structure_positions[i];
+
+                    var CBP = WBP_to_CBP(structure_root_block_pos);
+                    var CP = WBP_to_ChunkPos(structure_root_block_pos);
+
+                    chunk.map.Set(CBP, BlockType.ObsidionBlock);
+                }
+
+                chunk.generation_stage = ChunkGenerationStage.Populated;
             }
         }
 
@@ -783,9 +1021,27 @@ namespace blockengine
 
         public void DrawDebugGUI()
         {
+
+            //Raylib.DrawRectangle(640, 0, TextureHandler.block_atlas.Texture.Width, TextureHandler.block_atlas.Texture.Height, Color.Pink);
+            //Raylib.DrawTexture(TextureHandler.block_atlas.Texture, 640, 0, Color.White);
+
             var _target = 7 * ((render_distance * 2) * (render_distance * 2) * (render_distance * 2));
             Raylib.DrawText("Chunks Loaded: " + chunks.Count.ToString() + "/" + _target.ToString(), 32, 64, 25, Color.White);
             Raylib.DrawText("Entities Loaded: " + entities.Count.ToString() + "/" + garbage_entities.Count.ToString(), 32, 64 + 32, 25, Color.White);
+            Raylib.DrawText(last_player_chunk_position.x + ", " + last_player_chunk_position.y + ", " + last_player_chunk_position.z, 32, 64 + 32 + 32, 25, Color.White);
+            Raylib.DrawText("Scheduled tick blocks: " + scheduled_tick_blocks.Count().ToString(), 32, 64 + 32 + 32 + 32, 25, Color.White);
+        }
+
+        public void ChangeFogColor(Color newcolor)
+        {
+            fog_color = newcolor;
+            fog_color_array[0] = newcolor.R/255f;
+            fog_color_array[1] = newcolor.G/255f;
+            fog_color_array[2] = newcolor.B/255f;
+        }
+        public void ChangeRenderDistance(int distance)
+        {
+            render_distance = Math.Clamp(distance,2,4);
         }
 
         public void Cleanup()

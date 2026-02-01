@@ -3,6 +3,7 @@ whenever you work on this again heres a todo list.
 (X) Remake chunk building system to fix seams
   |___ (X) Model blocks
     |___ (X) Functional blocks (chests, mines, tech)
+  |___ Fix chunk building flickering
 
 Gui system
   |___ Inventory system

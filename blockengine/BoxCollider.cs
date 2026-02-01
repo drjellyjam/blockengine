@@ -22,6 +22,21 @@ namespace blockengine
             Size = max - min;
         }
 
+        public Vector3[] GetCorners()
+        {
+            return new Vector3[8] {
+            new Vector3(Min.X, Min.Y, Min.Z),new Vector3(Max.X,Min.Y,Min.Z), new Vector3(Min.X, Max.Y, Min.Z), new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),new Vector3(Max.X,Min.Y,Max.Z), new Vector3(Min.X, Max.Y, Max.Z), new Vector3(Max.X, Max.Y, Max.Z)};
+        }
+
+        public Vector3[] GetCornersAndCenter()
+        {
+            return new Vector3[9] {
+            Max - (Min/2),new Vector3(Min.X, Min.Y, Min.Z),new Vector3(Max.X,Min.Y,Min.Z), new Vector3(Min.X, Max.Y, Min.Z), new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),new Vector3(Max.X,Min.Y,Max.Z), new Vector3(Min.X, Max.Y, Max.Z), new Vector3(Max.X, Max.Y, Max.Z)};
+        }
+
+
         public bool CollidingWith(BoxCollider other)
         {
             return

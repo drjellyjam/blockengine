@@ -55,19 +55,20 @@ class Program
             Directory.CreateDirectory("Saves");
         }
 
-        Raylib.SetTraceLogLevel(TraceLogLevel.Error);
+
+        //Raylib.SetTraceLogLevel(TraceLogLevel.Error);
         Raylib.InitWindow(1280, 720, "Block Engine");
         Raylib.SetTargetFPS(120);
 
-        World world = new World(new WorldInfo("test world",67));
-        
-        world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
-
-        float max_frames = 0.1f;
-        float bi = max_frames*2;
- 
         ModelHandler.LoadModels();
         TextureHandler.CreateAtlasTextures();
+
+        World world = new World(new WorldInfo("test world",69));
+        world.ChangeFogColor(Color.Black);
+        world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
+
+        float max_frames = 0.025f;
+        float bi = max_frames;
 
         
         Task.Run(() =>
@@ -88,7 +89,7 @@ class Program
 
             //update
 
-            world.UpdateEntities();
+            world.UpdateWorld();
 
             bi -= 1 * Raylib.GetFrameTime();
             if (bi <= 0) {
@@ -103,7 +104,7 @@ class Program
 
             //behind 3d
 
-            Raylib.ClearBackground(Color.Gray);
+            Raylib.ClearBackground(world.fog_color);
 
             //3d
 
@@ -115,12 +116,17 @@ class Program
                 Raylib.DrawCube(Vector3.Zero, 1, 1, 1, Color.White);
             }
 
-            world.DrawAllChunks();
-            world.DrawEntities();
+            world.Draw();
 
             Raylib.EndMode3D();
 
             //ui
+
+            Entity? player = world.GetFocusEntity();
+            if (player != null)
+            {
+                player.DrawGui();
+            }
 
             Raylib.DrawFPS(10, 10);
             world.DrawDebugGUI();

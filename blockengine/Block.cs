@@ -59,16 +59,39 @@ namespace blockengine
         }
     }
 
+    public struct BlockDataEntry
+    {
+        private sbyte value;
+
+        public BlockDataEntry(sbyte _value)
+        {
+            value = _value;
+        }
+
+        public sbyte getValue()
+        {
+            return value;
+        }
+
+        public void setValue(sbyte _value)
+        {
+            value = _value;
+        }
+    }
+
     public abstract class Block //base block class
     {
         public BoxCollider collider = new BoxCollider(new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.5f, 0.5f, 0.5f));
         public BlockModel? BlockModel = null;
         public BlockFaces<string> FaceTextureIds = new BlockFaces<string>("Assets/Textures/missing.png");
+        public Dictionary<string, float> StartBlockData = new Dictionary<string, float>();
         public abstract string GetDisplayName();
         public virtual bool IsExists() { return true; }
         public virtual bool IsTranslucent() { return false; }
         public virtual bool IsNonSolid() { return false; }
         public virtual float GetDurability() { return 1f; }
+
+        public virtual bool NeedsInit() { return false; }
 
         public abstract BlockType GetBlockType();
 
@@ -93,13 +116,23 @@ namespace blockengine
             }
         }
 
+        public virtual void OnScheduledTick(World world,Int3 WBP)
+        {
+
+        }
+
+        public virtual void OnBlockInit(World world,Int3 WBP)
+        {
+
+        }
+
         public virtual void OnBlockBreak(World world,Int3 WBP)
         {
             world.AddEntity(new DroppedItemEntity(world, "DroppedItem", WBP.to_vector3() + (Vector3.One * 0.5f)));
         }
         public virtual void OnNearBlockChanged(World world,Int3 WBP, BlockType changed_block_type,Int3 changed_WBP) //A block around this one was placed or removed
         {
-
+            
         }
     }
     public class BlockModel

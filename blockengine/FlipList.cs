@@ -47,9 +47,19 @@ namespace blockengine
             }
         }
 
+        public void Remove(T item)
+        {
+            var _list = GetActiveList();
+            _list.Remove(item);
+        }
         public bool Has(T item)
         {
             return list1.Contains(item) || list2.Contains(item);
+        }
+
+        public int Count()
+        {
+            return list1.Count + list2.Count;
         }
 
         public void Clear()

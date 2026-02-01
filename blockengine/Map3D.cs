@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -14,8 +15,9 @@ namespace blockengine
         public int height;
         public int depth;
         public int fullsize;
-        public bool changed = true; //sets to true when changed.
+        public bool changed = false; //sets to true when changed.
         public int air = 0;
+        //public bool init = false;
 
         //Dictionary<string, int> trackers;
 
@@ -70,7 +72,7 @@ namespace blockengine
         {
             return (pos.x < 0 || pos.x > width - 1 || pos.y < 0 || pos.y > height - 1 || pos.z < 0 || pos.z > depth - 1);
         }
-        public ChunkBlock? Get(Int3 pos)
+        public ChunkBlock Get(Int3 pos)
         {
             if (!OutOfBounds(pos))
             {
@@ -84,14 +86,18 @@ namespace blockengine
             {
                 int idx = PositionToIndex(pos);
                 ChunkBlock prev = map[idx];
+                if (newblock == prev.block)
+                {
+                    return false;
+                }
+
                 Block prev_def = prev.GetBlockDef();
                 Block next_def = Globals.BlockDefinitions[newblock];
 
-                if (newblock == prev.block)
-                {
-                    changed = false;
-                    return false;
-                }
+                //if (next_def.NeedsInit())
+                //{
+                //    init = true;
+                //}
 
                 if (!prev_def.IsExists() && next_def.IsExists())
                 {
@@ -102,7 +108,12 @@ namespace blockengine
                     air++;
                 }
 
-                map[idx] = new ChunkBlock(newblock);
+                ChunkBlock b = new ChunkBlock(newblock);
+                foreach (string key in next_def.StartBlockData.Keys)
+                {
+                    b.SetBlockData(key, next_def.StartBlockData[key]);
+                }
+                map[idx] = b;
                 changed = true;
                 return true;
             }

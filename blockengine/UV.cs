@@ -18,5 +18,10 @@ namespace blockengine
             XMAX = xmax;
             YMAX = ymax;
         }
+
+        public float[] ToVector4()
+        {
+            return new float[4] { XMIN, YMIN, XMAX, YMAX };
+        }
     }
 }

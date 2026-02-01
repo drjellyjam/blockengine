@@ -5,20 +5,30 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
+using System.Xml.Serialization;
 
 namespace blockengine
 {
+    public enum ChunkGenerationStage
+    {
+        NotGenerated = 0,
+        Shaped,
+        Populated
+    }
     public class ChunkBlock
     {
-        public float health;
+        //public float health;
         public bool active;
         public BlockType block;
+        private Dictionary<string, float> blockData;
+        
 
         public ChunkBlock(BlockType _block)
         {
             block = _block;
-            var _block_def = Globals.BlockDefinitions[block];
-            health = _block_def.GetDurability();
+            //var _block_def = Globals.BlockDefinitions[block];
+            //health = _block_def.GetDurability();
+            blockData = new Dictionary<string, float>();
             active = true;
         }
 
@@ -26,6 +36,16 @@ namespace blockengine
         {
             return Globals.BlockDefinitions[block];
         }
+
+        public bool HasBlockData(string name)
+        {
+            return blockData.ContainsKey(name);
+        } 
+        public void SetBlockData(string name, float value)
+        {
+            blockData[name] = value;
+        }
+        public float GetBlockData(string name) { return blockData[name]; }
     }
     public class Chunk
     {
@@ -35,6 +55,7 @@ namespace blockengine
         public Int3 chunkpos;
         public bool needs_rebuilt;
         public bool first_built;
+        public ChunkGenerationStage generation_stage = ChunkGenerationStage.NotGenerated;
         public Chunk(Int3 chunkpos)
         {
             needs_rebuilt = false;
@@ -53,7 +74,7 @@ namespace blockengine
         }
         public void UnloadMeshes()
         {
-            generator.UnloadMeshes();
+            generator.UnloadAllMeshes();
         }
         public bool IsChanged()
         {
@@ -78,6 +99,12 @@ namespace blockengine
         public bool WontBuild()
         {
             return IsAir() || IsFull();
+        }
+
+        public BoxCollider GetCollider()
+        {
+            var _p = (chunkpos * Globals.chunk_size).to_vector3();
+            return new BoxCollider(_p,_p,_p + Globals.chunk_size.to_vector3() );
         }
     }
 }

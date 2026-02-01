@@ -27,6 +27,15 @@ namespace blockengine
 
         public bool Drawable = false;
         public bool DrawableT = false;
+
+        public int last_vertcount = 0;
+        public int last_vertcountT = 0;
+
+        public bool mesh_changed = false;
+        public bool meshT_changed = false;
+
+        public bool is_generating = false;
+        public AutoResetEvent done_generating_event = new AutoResetEvent(false);
         public ChunkMeshGenerator()
         {
             mesh = new Mesh();
@@ -44,17 +53,23 @@ namespace blockengine
 
         public void Clear()
         {
+            last_vertcount = vertcount;
+            last_vertcountT = vertcountT;
+
+            Console.WriteLine("Clearing mesh data!!");
             verts.Clear();
             normals.Clear();
             uvs.Clear();
             vertcolors.Clear();
             vertcount = 0;
+            mesh_changed = false;
 
             vertsT.Clear();
             normalsT.Clear();
             uvsT.Clear();
             vertcolorsT.Clear();
             vertcountT = 0;
+            meshT_changed = false;
         }
 
         public void AddParsedOBJ(BlockModel blockmodel, Vector3 center_pos, Vector3 vertex_offset, Vector3 scale)
@@ -86,6 +101,7 @@ namespace blockengine
                 normals.Add(norm);
                 uvs.Add(uv);
                 vertcolors.Add(color);
+                mesh_changed = true;
             }
             else
             {
@@ -93,6 +109,7 @@ namespace blockengine
                 normalsT.Add(norm);
                 uvsT.Add(uv);
                 vertcolorsT.Add(color);
+                meshT_changed = true;
             }
         }
 
@@ -250,7 +267,7 @@ namespace blockengine
             }
         }
 
-        public void UnloadMeshes()
+        public void UnloadAllMeshes()
         {
             if (Drawable)
             {
@@ -274,8 +291,25 @@ namespace blockengine
             //Console.WriteLine("uvs: " + uvs.Count + "/" + uvsT.Count);
             //Console.WriteLine("vcolors: " + vertcolors.Count + "/" + vertcolorsT.Count);
 
-            int b1 = GenerateMesh();
-            int b2 = GenerateMeshT();
+            is_generating = true;
+
+            int b1 = 0;
+            int b2 = 0;
+
+            vertcount = verts.Count;
+            vertcountT = vertsT.Count;
+
+            if (mesh_changed || (last_vertcount > 0 && vertcount == 0))
+            {
+                b1 = GenerateMesh();
+            }
+            if (meshT_changed || (last_vertcountT > 0 && vertcountT == 0))
+            {
+                b2 = GenerateMeshT();
+            }
+
+            is_generating = false;
+            done_generating_event.Set();
 
             if (b1 == 2 || b2 == 2)
             {
@@ -291,8 +325,6 @@ namespace blockengine
                 return 2;
             }
 
-            vertcountT = vertsT.Count;
-
             if (vertcountT <= 2)
             {
                 //Console.WriteLine("Not building empty mesh! (translucent)");
@@ -307,20 +339,26 @@ namespace blockengine
                 DrawableT = false;
             }
 
-            meshT.TriangleCount = vertcountT / 3;
-            meshT.VertexCount = vertcountT;
+            var _vertcountT = vertcountT;
+            var _vertsT = vertsT.ToArray();
+            var _normalsT = normalsT.ToArray();
+            var _uvsT = uvsT.ToArray();
+            var _vertcolorsT = vertcolorsT.ToArray();
+
+            meshT.TriangleCount = _vertcountT / 3;
+            meshT.VertexCount = _vertcountT;
 
             meshT.AllocVertices();
             meshT.AllocNormals();
             meshT.AllocTexCoords();
             meshT.AllocColors();
 
-            for (int i = 0; i < vertcountT; i++)
+            for (int i = 0; i < _vertcountT; i++)
             {
-                meshT.VerticesAs<Vector3>()[i] = vertsT[i];
-                meshT.NormalsAs<Vector3>()[i] = normalsT[i];
-                meshT.TexCoordsAs<Vector2>()[i] = uvsT[i];
-                meshT.ColorsAs<Color>()[i] = vertcolorsT[i];
+                meshT.VerticesAs<Vector3>()[i] = _vertsT[i];
+                meshT.NormalsAs<Vector3>()[i] = _normalsT[i];
+                meshT.TexCoordsAs<Vector2>()[i] = _uvsT[i];
+                meshT.ColorsAs<Color>()[i] = _vertcolorsT[i];
             }
 
             Raylib.UploadMesh(ref meshT, false);
@@ -353,20 +391,26 @@ namespace blockengine
                 Drawable = false;
             }
 
-            mesh.TriangleCount = vertcount / 3;
-            mesh.VertexCount = vertcount;
+            var _vertcount = vertcount;
+            var _verts = verts.ToArray();
+            var _normals = normals.ToArray();
+            var _uvs = uvs.ToArray();
+            var _vertcolors = vertcolors.ToArray();
+
+            mesh.TriangleCount = _vertcount / 3;
+            mesh.VertexCount = _vertcount;
 
             mesh.AllocVertices();
             mesh.AllocNormals();
             mesh.AllocTexCoords();
             mesh.AllocColors();
 
-            for (int i = 0; i < vertcount; i++)
+            for (int i = 0; i < _vertcount; i++)
             {
-                mesh.VerticesAs<Vector3>()[i] = verts[i];
-                mesh.NormalsAs<Vector3>()[i] = normals[i];
-                mesh.TexCoordsAs<Vector2>()[i] = uvs[i];
-                mesh.ColorsAs<Color>()[i] = vertcolors[i];
+                mesh.VerticesAs<Vector3>()[i] = _verts[i];
+                mesh.NormalsAs<Vector3>()[i] = _normals[i];
+                mesh.TexCoordsAs<Vector2>()[i] = _uvs[i];
+                mesh.ColorsAs<Color>()[i] = _vertcolors[i];
             }
 
             Raylib.UploadMesh(ref mesh,false);

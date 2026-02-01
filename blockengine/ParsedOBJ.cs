@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Raylib_cs;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -26,6 +27,7 @@ namespace blockengine
         public List<Vector3> vertex_normals;
         public List<Vector2> vertex_uvs;
         public List<Int3> faces;
+        public Mesh mesh;
         public int face_count;
         public ParsedOBJ()
         {
@@ -60,6 +62,34 @@ namespace blockengine
         {
             Int3 face = faces[index];
             return new ParsedOBJVertex(vertex_positions[face.x], vertex_uvs[face.y], vertex_normals[face.z]);
+        }
+
+        public void UnloadMesh()
+        {
+            Raylib.UnloadMesh(mesh);
+        }
+        public void UploadMesh()
+        {
+            mesh.TriangleCount = face_count;
+            mesh.VertexCount = face_count * 2;
+
+            mesh.AllocVertices();
+            mesh.AllocNormals();
+            mesh.AllocTexCoords();
+            mesh.AllocColors();
+
+            for (int vi = 0; vi<face_count; vi++)
+            {
+                var vertex = GetVertex(vi);
+
+                mesh.VerticesAs<Vector3>()[vi] = vertex.Position;
+                mesh.NormalsAs<Vector3>()[vi] = vertex.Normal;
+                mesh.TexCoordsAs<Vector2>()[vi] = vertex.UV;
+                mesh.ColorsAs<Color>()[vi] = Color.White;
+            }
+
+            Console.WriteLine("Uploading model mesh");
+            Raylib.UploadMesh(ref mesh, false);
         }
     }
 }

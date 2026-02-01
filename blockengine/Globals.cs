@@ -1,16 +1,33 @@
 ﻿using Raylib_cs;
+using static Raylib_cs.Raymath;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using blockengine.Items;
 
 namespace blockengine
 {
     public static class Globals
     {
         public static Int3 chunk_size = new Int3(16,16,16);
+        public static float chunk_fullsize = (chunk_size.x * chunk_size.y) * chunk_size.z;
+        public static int PositionToIndex(Int3 pos)
+        {
+            return ((int)pos.z * chunk_size.x * chunk_size.y) + ((int)pos.y * chunk_size.x) + (int)pos.x;
+        }
+
+        public static Int3 IndexToPosition(int idx)
+        {
+            int x, y, z;
+            x = idx % chunk_size.x;
+            y = (idx / chunk_size.x) % chunk_size.y;
+            z = idx / (chunk_size.x * chunk_size.y);
+            return new Int3(x, y, z);
+        }
+
         public static float BlockScale = 1f;
         public static Dictionary<BlockType, Block> BlockDefinitions = new Dictionary<BlockType, Block>()
         {
@@ -20,13 +37,21 @@ namespace blockengine
             //[1] = new BlockDefinition("Grass", true, false, false, new BlockFaces("Assets/Textures/grassblock_top.png", "Assets/Textures/dirt.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png", "Assets/Textures/grassblock_side.png")),
             [BlockType.GreyStoneBlock] = new GreyStoneBlock(),//new BlockDefinition(new GreyStoneBlock(), "Grey Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone.png")),
             [BlockType.BrownStoneBlock] = new BrownStoneBlock(),//new BlockDefinition(new BrownStoneBlock(), "Brown Stone", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/brownstone.png")),
-            //["BLUE_ORE"] = new BlockDefinition("Blue Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_blueore.png")),
+            [BlockType.BlueOreBlock] = new BlueOreBlock(),
+            [BlockType.WhiteOreBlock] = new WhiteOreBlock(),
+            [BlockType.WaterBlock] = new WaterBlock(),
+            [BlockType.LavaBlock] = new LavaBlock(),
+            [BlockType.ObsidionBlock] = new ObsidionBlock(),
             //["WHITE_ORE"] = new BlockDefinition("White Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_whiteore.png")),
-            //["PROTO_GLASS"] = new BlockDefinition("Proto Glass",true,false,true,1,null,new BlockFaces<string>("Assets/Textures/proto_glass.png")),
+            [BlockType.ProtoGlassBlock] = new ProtoGlassBlock(),
             [BlockType.MineBlock] = new MineBlock(),//new BlockDefinition(new MineBlock(), "Mine", true, false, true, 1, new BlockModel("Assets/Models/mine.obj", "Assets/Textures/mine.png", Vector3.One * 0.4f, Vector3.Zero, new BlockFaces<bool>(true)))
             //[3] = new BlockDefinition("Dirt", true, false, false, new BlockFaces("Assets/Textures/dirt.png")),
             //[4] = new BlockDefinition("Log", true, false, false, new BlockFaces("Assets/Textures/log_top.png", "Assets/Textures/log_top.png", "Assets/Textures/log_side.png"))
         };
+        public static Dictionary<ItemType, Item> ItemDefinitions = new Dictionary<ItemType, Item>() {
+            
+        };
+
         public static Int3[] block_normals = new Int3[6]
         {
             new Int3(-1,0,0),
@@ -398,10 +423,11 @@ namespace blockengine
             new Int3(3,3,2),
             new Int3(3,3,3)
         };
-
         public static int flood_draw_dist_high = 343;
         public static int flood_draw_dist_medium = 125;
         public static int flood_draw_dist_low = 27;
+
+        
 
         public static float GetDelta()
         {
@@ -440,6 +466,11 @@ namespace blockengine
                 better_modI(n.y, m.y),
                 better_modI(n.z, m.z)
             );
+        }
+
+        public static bool CubeInView(Vector3 cam_pos,Vector3 cam_target,BoxCollider cube)
+        {
+            return true;
         }
     }
 }
