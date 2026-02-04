@@ -4,7 +4,7 @@ My C# Raylib based voxel engine
 
 features:
 
-. Infinite chunks
+. Infinite cubic chunks
 
 . multiple blocks (system needs revamp)
 
