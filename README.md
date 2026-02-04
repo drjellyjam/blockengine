@@ -12,7 +12,7 @@ features:
 
 . block collision checking
 
-. block raycasting (slightly broken in coordinates less than 0)
+. block raycasting
 
 . Multi Threading
 
