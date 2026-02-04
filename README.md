@@ -15,3 +15,5 @@ features:
 . block raycasting (slightly broken in coordinates less than 0)
 
 . Multi Threading
+
+. Structures
