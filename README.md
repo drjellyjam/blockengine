@@ -6,9 +6,9 @@ features:
 
 . Infinite cubic chunks
 
-. multiple blocks (system needs revamp)
+. multiple blocks
 
-. runtime texture atlas generation from seperate texture files (bad)
+. runtime texture atlas generation from seperate texture files (ok)
 
 . block collision checking
 
