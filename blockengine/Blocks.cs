@@ -21,6 +21,7 @@ namespace blockengine
         WaterBlock,
         LavaBlock,
         ObsidionBlock,
+        StoneBrickBlock,
 
         BlockCount
     }
@@ -68,6 +69,24 @@ namespace blockengine
         public override BlockType GetBlockType()
         {
             return BlockType.GreyStoneBlock;
+        }
+    }
+
+    public class StoneBrickBlock : Block
+    {
+        public StoneBrickBlock()
+        {
+            FaceTextureIds = new BlockFaces<string>("Assets/Textures/stone_brick.png");
+        }
+
+        public override string GetDisplayName()
+        {
+            return "Stone Brick";
+        }
+
+        public override BlockType GetBlockType()
+        {
+            return BlockType.StoneBrickBlock;
         }
     }
 

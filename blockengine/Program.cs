@@ -45,7 +45,15 @@ class Program
         //flood(new List<Int3>(){ new Int3(0,0,0) },2);
         //Console.WriteLine("");
         //Console.WriteLine("Done " + list.Count);
-        //return;
+
+        var pseudo = new PseudoRandom();
+        for (int i = 0; i<(8*8)*8; i++)
+        {
+            Int3 pos = Globals.IndexToPosition(i, new Int3(8, 8, 8));
+            Console.WriteLine(pseudo.GetTileInt(pos.x,pos.y,pos.z, 10));
+        }
+        
+        
         
         bool hacky_fix_draw_glitch = true;
         bool draw_debug = false;
@@ -63,7 +71,7 @@ class Program
         ModelHandler.LoadModels();
         TextureHandler.CreateAtlasTextures();
 
-        World world = new World(new WorldInfo("test world",69));
+        World world = new World(new WorldInfo("test world",Raylib.GetRandomValue(-99999,99999)));
         world.ChangeFogColor(Color.Black);
         world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
 

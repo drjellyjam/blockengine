@@ -24,6 +24,11 @@ namespace blockengine
             return new Int3() { x = yc1.x + yc2.x, y = yc1.y + yc2.y, z = yc1.z + yc2.z };
         }
 
+        public static Int3 operator +(Int3 yc1, int yc2)
+        {
+            return new Int3() { x = yc1.x + yc2, y = yc1.y + yc2, z = yc1.z + yc2 };
+        }
+
         public static Int3 operator -(Int3 yc1, Int3 yc2)
         {
             return new Int3() { x = yc1.x - yc2.x, y = yc1.y - yc2.y, z = yc1.z - yc2.z };

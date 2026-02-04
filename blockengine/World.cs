@@ -21,7 +21,7 @@ namespace blockengine
         WorldType_flat,
         WorldType_void
     }
-    public struct WorldInfo 
+    public struct WorldInfo
     {
         public string world_name;
         public int world_seed;
@@ -49,6 +49,9 @@ namespace blockengine
         private string focused_entity_id = "-1";
 
         private FastNoiseLite fnl;
+        private FastNoiseLite graphfnl;
+        private FastNoiseLite graphfnl2;
+        private FastNoiseLite graphfnl3;
 
         private bool blocks_changing = false;
         private int block_changes_being_made = 0;
@@ -64,11 +67,12 @@ namespace blockengine
         int shader_uniform_texture_emissive_pos;
         int shader_uniform_fog_color;
         int shader_uniform_fog_mult;
-        int render_distance = 2;
+        int render_distance = 4;
         int entities_updated = 0;
         int entities_updated_per_frame = 120;
         public Color fog_color = Color.Black;
-        private float[] fog_color_array = new float[3] {0.0f,0.0f,0.0f};
+        private float[] fog_color_array = new float[3] { 0.0f, 0.0f, 0.0f };
+        private PseudoRandom pseudo;
 
         float tick = 1;
         int ticks = 0;
@@ -79,6 +83,22 @@ namespace blockengine
             info = world_info;
             fnl = new FastNoiseLite(info.world_seed);
             fnl.SetFrequency(0.02f);
+
+            var freq = 1;
+
+            graphfnl = new FastNoiseLite(info.world_seed * 2);
+            graphfnl.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+            graphfnl.SetFrequency(freq);
+
+            graphfnl2 = new FastNoiseLite(info.world_seed * 3);
+            graphfnl2.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+            graphfnl2.SetFrequency(freq);
+
+            graphfnl3 = new FastNoiseLite(info.world_seed * 4);
+            graphfnl3.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
+            graphfnl3.SetFrequency(freq);
+
+            pseudo = new PseudoRandom();
 
             genrandom = new Random(info.world_seed);
 
@@ -422,7 +442,7 @@ namespace blockengine
             }
         }
 
-        public bool SetBlock(Int3 world_block_pos,BlockType newblock,bool preform_block_updates = true)
+        public bool SetBlock(Int3 world_block_pos, BlockType newblock, bool preform_block_updates = true)
         {
             if (!blocks_changing)
             {
@@ -475,7 +495,7 @@ namespace blockengine
                     return true;
                 }
 
-                
+
             }
             return false;
         }
@@ -505,7 +525,7 @@ namespace blockengine
             }
         }
 
-        public float GetBlockData(Int3 world_block_pos,string name)
+        public float GetBlockData(Int3 world_block_pos, string name)
         {
             ChunkBlock? block = GetBlock(world_block_pos);
             if (block != null && block.HasBlockData(name))
@@ -523,12 +543,12 @@ namespace blockengine
             }
             return false;
         }
-        public void SetBlockData(Int3 world_block_pos, string name,float value)
+        public void SetBlockData(Int3 world_block_pos, string name, float value)
         {
             ChunkBlock? block = GetBlock(world_block_pos);
             if (block != null)
             {
-                block.SetBlockData(name,value);
+                block.SetBlockData(name, value);
             }
         }
 
@@ -553,8 +573,8 @@ namespace blockengine
                 return false;
             }
 
-            chunks.Add( chunk_pos, new Chunk(chunk_pos) );
-            
+            chunks.Add(chunk_pos, new Chunk(chunk_pos));
+
 
             return true;
         }
@@ -569,7 +589,7 @@ namespace blockengine
             }
         }
 
-        public int ChunkBuildMesh(Int3 chunk_pos,bool _frominside = false)
+        public int ChunkBuildMesh(Int3 chunk_pos, bool _frominside = false)
         {
             Chunk? chunk = GetChunk(chunk_pos);
             if (chunk != null && (chunk.needs_rebuilt || chunk.IsChanged() || (chunk.WillBuild() && !chunk.first_built)))
@@ -614,7 +634,7 @@ namespace blockengine
                             }
                         }
 
-                        for (int ni = 0; ni<Globals.block_normals.Length; ni++)
+                        for (int ni = 0; ni < Globals.block_normals.Length; ni++)
                         {
                             Int3 norm = Globals.block_normals[ni];
                             var at_WBP = WBP + norm;
@@ -648,8 +668,8 @@ namespace blockengine
                 //    //upload_wait.WaitOne();
                 //}
 
-                
-                
+
+
 
                 chunk_upload_list.Add(chunk_pos);
                 return 1;
@@ -699,7 +719,7 @@ namespace blockengine
             //var generated_chunks = 0;
             //var built_chunks = 0;
 
-            for (int i = 0; i<Globals.flood_draw_dist_low; i++)
+            for (int i = 0; i < Globals.flood_draw_dist_low; i++)
             {
                 Int3 floodpos = Globals.flood_positions[i];
                 var cp = last_player_chunk_position + floodpos;
@@ -709,7 +729,7 @@ namespace blockengine
                 {
                     ChunkGenerate_Shaping(cp);
                 }
-                for (int j = 0; j<Globals.block_normals.Length; j++)
+                for (int j = 0; j < Globals.block_normals.Length; j++)
                 {
                     var npos = Globals.block_normals[j];
                     bool ncreated = ChunkCreate(cp + npos);
@@ -730,10 +750,10 @@ namespace blockengine
             //stop.Stop();
             //if (stop.ElapsedMilliseconds > 0)
             //{
-                //Console.WriteLine(stop.ElapsedMilliseconds);
+            //Console.WriteLine(stop.ElapsedMilliseconds);
             //}
 
-            
+
             foreach (Int3 cpos in chunks.Keys)
             {
                 if (cpos.x < last_player_chunk_position.x - unoad_size || cpos.x > last_player_chunk_position.x + unoad_size ||
@@ -743,12 +763,12 @@ namespace blockengine
                     chunk_unload_list.Add(cpos);
                 }
             }
-            
+
             //Console.WriteLine("Generation Cycle Finished!");
         }
 
         public void UploadChunks()
-        {  
+        {
             //Console.WriteLine("Uploading chunks");
 
             List<Int3> upload_list = chunk_upload_list.GetInactiveList();
@@ -778,7 +798,7 @@ namespace blockengine
 
             //unload
 
-            
+
             //Console.WriteLine("Unloading chunks");
 
             List<Int3> unload_list = chunk_unload_list.GetInactiveList();
@@ -796,11 +816,11 @@ namespace blockengine
             {
                 //Console.WriteLine("Unload Cycle Finished (" + _unload_amt.ToString() + ")");
             }
-            
+
 
         }
 
-        
+
         public void Draw()
         {
             DrawEntities();
@@ -814,7 +834,7 @@ namespace blockengine
             {
                 fog_mult = 0.015f;
             }
-            else if(render_distance == 2)
+            else if (render_distance == 2)
             {
                 fog_mult = 0.05f;
             }
@@ -839,17 +859,20 @@ namespace blockengine
                     for (int z = -buildsize; z <= buildsize; z++)
                     {
                         var pos = last_player_chunk_position + new Int3(x, y, z);
-                        Chunk? chunk = GetChunk(pos);
-                        if (chunk != null)
+                        if (!chunk_unload_list.Has(pos))
                         {
-                            if (Globals.CubeInView(cam.Position,cam.Target,chunk.GetCollider()))
+                            Chunk? chunk = GetChunk(pos);
+                            if (chunk != null)
                             {
-                                if (chunk.generator.Drawable)
+                                if (Globals.CubeInView(cam.Position, cam.Target, chunk.GetCollider()))
                                 {
-                                    Raylib.DrawMesh(chunk.generator.mesh, chunk_material, chunk.transform);
+                                    if (chunk.generator.Drawable)
+                                    {
+                                        Raylib.DrawMesh(chunk.generator.mesh, chunk_material, chunk.transform);
+                                    }
+
+                                    //Raylib.DrawCubeWires((pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                                 }
-                                
-                                //Raylib.DrawCubeWires((pos.to_vector3() + new Vector3(0.5f, 0.5f, 0.5f)) * Globals.chunk_size.to_vector3(), Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, Color.White);
                             }
                         }
                     }
@@ -871,67 +894,173 @@ namespace blockengine
                                 {
                                     Raylib.DrawMesh(chunk.generator.meshT, chunk_material, chunk.transform);
                                 }
-                                
+
                             }
                         }
                     }
                 }
             }
             Raylib.EndShaderMode();
+
+            //draw structure positions
+            /*
+            bool force_raw = Raylib.IsKeyDown(KeyboardKey.G);
+
+            if (force_raw)
+            {
+                List<Int3> points = GetStructureGeneratePositions(last_player_chunk_position, StructuresType.MiniCastle);
+                for (int i = 0; i < points.Count; i++)
+                {
+                    Int3 point = points[i];
+                    Structure structr = Globals.StructureDefinitions[StructuresType.MiniCastle];
+                    BoxCollider bc = structr.GetBoxCollider(point);
+                    //Int3 apos = new Int3(structr.width - structr.anchor_pos.x, structr.height - structr.anchor_pos.y, structr.anchor_pos.z);
+                    //var rp = (raw.to_vector3() + new Vector3(structr.width / 2f, structr.height / 2, structr.depth / 2f)) - apos.to_vector3();
+                    //var pp = (point.to_vector3() + new Vector3(structr.width / 2f, structr.height / 2, structr.depth / 2f)) - apos.to_vector3();
+
+
+                    Raylib.DrawCubeWiresV(bc.Position + bc.Min + bc.Size/2, bc.Size, Color.Red);
+                    Vector3[] corners = bc.GetCorners();
+                    foreach (Vector3 corn in corners)
+                    {
+                        Raylib.DrawSphere(bc.Position + corn, 0.1f, Color.Green);
+                    }
+                    //Raylib.DrawLine3D(pp, rp, Color.Green);
+                    //Raylib.DrawCubeWires(rp, structr.width, structr.height, structr.depth, Color.Green);
+                }
+            }
+            */
         }
 
         #endregion
 
         #region CHUNK GENERATION
 
-        public List<Int3> GetStructureGeneratePositions(Int3 chunk_pos, Int3 offset, int random_mult = 0,int scale = 8)
+        public bool Gen_BlockIsAir(Int3 pos)
         {
-            List<Int3> positions = new List<Int3>();
-            var cp_wb = (chunk_pos * Globals.chunk_size) - Globals.chunk_size;
-            var cp_wb_mod = new Int3(Globals.better_modI(cp_wb.x + offset.x, scale), Globals.better_modI(cp_wb.y + offset.y, scale), Globals.better_modI(cp_wb.z + offset.z, scale));
+            return fnl.GetNoise(pos.x, pos.y, pos.z) > 0.5;
+        }
 
-            var next_x = scale - cp_wb_mod.x;
-            var next_y = scale - cp_wb_mod.y;
-            var next_z = scale - cp_wb_mod.z;
+        /*
+         * SHOULD PRETTY MUCH ONLY BE CALLED DURRING GENERATION AS IT IS COMPLICATED
+         */
+        public List<Int3> GetStructureGeneratePositions(Int3 chunk_pos, StructuresType structtype, bool force_raw = false)
+        {
+            var points = new List<Int3>();
+            List<BoxCollider> structure_colliders = new List<BoxCollider>();
 
-            var p_x = cp_wb;
+            Structure structr = Globals.StructureDefinitions[structtype];
 
-            for (int sx = -Globals.chunk_size.x; sx < Globals.chunk_size.x; sx++)
+            Int3 CWP = chunk_pos * Globals.chunk_size;
+
+            int struct_wc = (int)MathF.Floor(structr.width / structr.graph_scale) + 1;
+            int struct_hc = (int)MathF.Floor(structr.height / structr.graph_scale) + 1;
+            int struct_dc = (int)MathF.Floor(structr.depth / structr.graph_scale) + 3;
+            int ofx = Globals.better_modI(structr.graph_offset.x, struct_wc);
+            int ofy = Globals.better_modI(structr.graph_offset.y, struct_hc);
+            int ofz = Globals.better_modI(structr.graph_offset.z, struct_dc);
+            int cdmax = Globals.chunk_size.z;
+
+            Int3 start = (CWP / structr.graph_scale) + new Int3(ofx, ofy, ofz);
+
+            for (int x = -struct_wc; x < (Globals.chunk_size.x / structr.graph_scale) + struct_wc + 1; x++)
             {
-                p_x.x += next_x;
-                next_x = scale;
-
-                var p_y = p_x;
-                
-                for (int sy = -Globals.chunk_size.y; sy < Globals.chunk_size.y; sy++)
+                for (int y = -struct_hc; y < (Globals.chunk_size.y / structr.graph_scale) + struct_hc + 1; y++)
                 {
-                    p_y.y += next_y;
-                    next_y = scale;
-
-                    var p_z = p_y;
-
-                    for (int sz = -Globals.chunk_size.z; sz < Globals.chunk_size.z; sz++)
+                    for (int z = -struct_dc; z < (Globals.chunk_size.z / structr.graph_scale) + struct_dc + 1; z++)
                     {
-                        p_z.z += next_z;
-                        next_z = scale;
+                        Int3 p = start + new Int3(x, y, z);
+                        p *= structr.graph_scale;
+                        p += structr.graph_offset;
 
-                        var ppp = new Int3(p_x.x, p_y.y, p_z.z);
+                        int nx = (int)(graphfnl.GetNoise(p.x, p.y, p.z) * structr.graph_randomness);
+                        int ny = (int)(graphfnl2.GetNoise(p.x, p.y, p.z) * structr.graph_randomness);
+                        int nz = (int)(graphfnl3.GetNoise(p.x, p.y, p.z) * structr.graph_randomness);
 
-                        //var v2 = Globals.GetPseudoRandom(p_x.x);
+                        p -= structr.graph_offset;
 
-                        var p = ppp + new Int3(genrandom.Next(-random_mult, random_mult), genrandom.Next(-random_mult, random_mult), genrandom.Next(-random_mult, random_mult));
+                        p += new Int3(nx, ny, nz);
 
-                        if (p.x >= cp_wb.x && p.x <= cp_wb.x + Globals.chunk_size.x &&
-                            p.y >= cp_wb.y && p.y <= cp_wb.y + Globals.chunk_size.y &&
-                            p.z >= cp_wb.z && p.z <= cp_wb.z + Globals.chunk_size.z)
+                        //Int3 praw = p;
+
+                        bool reached_floor = true;
+                        if (structr.structurePositionType == StructurePositionType.OnGround && !force_raw) {
+                            reached_floor = false;
+
+                            bool last_up = Gen_BlockIsAir(p);
+                            bool last_down = Gen_BlockIsAir(p);
+                            int cd = 0;
+                            while (cd<cdmax) {
+                                bool this_down = Gen_BlockIsAir(p + new Int3(0,0,cd));
+                                bool this_up = Gen_BlockIsAir(p - new Int3(0, 0, cd));
+          
+                                if (! last_down && this_down) {
+                                    p.z = p.z + (cd - 1);
+                                    reached_floor = true;
+            
+                                    break;
+                                }
+
+                                if (last_up && ! this_up) {
+                                    p.z = p.z - (cd + 1);
+                                    reached_floor = true;
+                                    break;
+                                }
+
+                                last_up = this_up;
+                                last_down = this_down;
+
+                                cd = cd + 1;
+                            }
+                        }
+
+                        if (reached_floor)
                         {
-                            positions.Add(p);
+                            //collsision check
+
+                            bool collided = false;
+                            BoxCollider thisbc = structr.GetBoxCollider(p);
+                            for (int bci = 0; bci < structure_colliders.Count; bci++)
+                            {
+                                BoxCollider bc = structure_colliders[bci];
+
+                                if (thisbc.CollidingWith(bc))
+                                {
+                                    collided = true;
+                                    break;
+                                }
+                            }
+                            if (!collided)
+                            {
+                                var structx_min = p.x - structr.anchor_pos.x;
+                                var structy_min = p.y - structr.anchor_pos.y;
+                                var structz_min = p.z - structr.anchor_pos.z;
+                                var structx_max = p.x + (structr.width - structr.anchor_pos.x);
+                                var structy_max = p.y + (structr.height - structr.anchor_pos.y);
+                                var structz_max = p.z + (structr.depth - structr.anchor_pos.z);
+
+                                if (structx_min <= CWP.x + Globals.chunk_size.x && structx_max >= CWP.x &&
+                                   structy_min <= CWP.y + Globals.chunk_size.y && structy_max >= CWP.y &&
+                                   structz_min <= CWP.z + Globals.chunk_size.z && structz_max >= CWP.z)
+                                {
+                                    if (!points.Contains(p))
+                                    {
+                                        
+                                        points.Add(p);
+                                        //raw_points.Add(praw);
+                                    }
+                                }
+                                structure_colliders.Add(structr.GetBoxCollider(p));
+                            }
+                            
                         }
                     }
                 }
             }
-            return positions;
+
+            return points;//(points, raw_points);
         }
+
         public void ChunkGenerate_Shaping(Int3 chunk_pos)
         {
             Chunk? chunk = GetChunk(chunk_pos);
@@ -945,13 +1074,13 @@ namespace blockengine
 
                     /*
                     
-                    if (WBP.z == -2 && WBP.x >= -1 && WBP.x <= 1 && WBP.y >= -1 && WBP.y <= 1)
+                    if (WBP.z != -1)
                     {
-                        v = BlockType.GreyStoneBlock;
+                        v = BlockType.AirBlock;
                     }
                     */
 
-                    
+
                     if (WBP.x > -5 && WBP.x < 5 && WBP.y > -5 && WBP.y < 5 && WBP.z > -5 && WBP.z < 5)
                     {
                         if (WBP.x == 4 || WBP.y == 4 || WBP.z == 4 || WBP.z == -4 || WBP.x == -4 || WBP.y == -4)
@@ -965,7 +1094,7 @@ namespace blockengine
                     }
                     else
                     {
-                        if (fnl.GetNoise(WBP.x, WBP.y, WBP.z) > 0.5)
+                        if (Gen_BlockIsAir(WBP))
                         {
                             v = BlockType.AirBlock;
                         }
@@ -1002,15 +1131,59 @@ namespace blockengine
             Chunk? chunk = GetChunk(chunk_pos);
             if (chunk != null)
             {
-                List<Int3> structure_positions = GetStructureGeneratePositions(chunk_pos, new Int3(0,0,0), 1, 4);
-                for (int i = 0; i < structure_positions.Count; i++)
+                //List<BoxCollider> structure_colliders = new List<BoxCollider>();
+                Int3 WCP = chunk_pos * Globals.chunk_size;
+                foreach (Structure structure in Globals.StructureDefinitions.Values)
                 {
-                    Int3 structure_root_block_pos = structure_positions[i];
+                    //Int3 anchor = new Int3(structure.width - structure.anchor_pos.x, structure.height - structure.anchor_pos.y, structure.depth - (structure.depth - structure.anchor_pos.z));
+                    List<Int3> structure_positions = GetStructureGeneratePositions(chunk_pos, structure.structureType);
+                
+                    for (int i = 0; i< structure_positions.Count; i++)
+                    {
+                        Int3 pos = structure_positions[i];
 
-                    var CBP = WBP_to_CBP(structure_root_block_pos);
-                    var CP = WBP_to_ChunkPos(structure_root_block_pos);
+                        bool generate = true;
+                        //BoxCollider thisbc = structure.GetBoxCollider(pos);
+                        //for (int bci = 0; bci < structure_colliders.Count; bci ++)
+                        //{
+                        //    BoxCollider bc = structure_colliders[bci];
+                        //
+                        //    if (thisbc.CollidingWith(bc)) 
+                        //    {
+                        //        generate = false;
+                        //        break;
+                        //    }
+                        //}
 
-                    chunk.map.Set(CBP, BlockType.ObsidionBlock);
+                        if (generate)
+                        {
+                            BlockRect struct_area = structure.GetChunkIntersection(pos, chunk_pos);
+
+                            for (int x = struct_area.XMIN; x < struct_area.XMIN + struct_area.XMAX; x++)
+                            {
+                                for (int y = struct_area.YMIN; y < struct_area.YMIN + struct_area.YMAX; y++)
+                                {
+                                    for (int z = struct_area.ZMIN; z < struct_area.ZMIN + struct_area.ZMAX; z++)
+                                    {
+                                        Int3 local_blockpos = new Int3(x, y, z);
+
+                                        var j = structure.PositionToIndex(local_blockpos);
+                                        //Console.WriteLine(j);
+
+                                        Int3 world_blockpos = (pos - structure.anchor_pos) + local_blockpos;
+                                        Int3 CBP = WBP_to_CBP(world_blockpos);
+                                        BlockType bt = (BlockType)structure.blockmap[j];
+
+                                        if (bt != BlockType.AirBlock)
+                                        {
+                                            chunk.map.Set(CBP, bt);
+                                        }
+
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 chunk.generation_stage = ChunkGenerationStage.Populated;

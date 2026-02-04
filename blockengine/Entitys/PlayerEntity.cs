@@ -38,6 +38,7 @@ namespace blockengine.Entitys
         private float hit_anim = 0;
         private float bob_anim = 0;
         private InventoryGUI invgui;
+        private bool noclipping = false;
         //private RenderTexture2D viewmodel_rendertexture;
         public PlayerEntity(World _world, string _Name, Vector3 _position) : base(_world, _Name, _position)
         {
@@ -104,13 +105,14 @@ namespace blockengine.Entitys
 
             float forwardaxis = (Raylib.IsKeyDown(KeyboardKey.W) - Raylib.IsKeyDown(KeyboardKey.S));
             float rightaxis = (Raylib.IsKeyDown(KeyboardKey.A) - Raylib.IsKeyDown(KeyboardKey.D));
+            float upaxis = (Raylib.IsKeyDown(KeyboardKey.Space) - Raylib.IsKeyDown(KeyboardKey.LeftShift));
 
             float hsp = camforward.X * forwardaxis * spd;
             float vsp = camforward.Y * forwardaxis * spd;
             hsp += camright.X * rightaxis * spd;
             vsp += camright.Y * rightaxis * spd;
 
-            Velocity.Z -= gravity;
+            if (!noclipping) { Velocity.Z -= gravity; } else { Velocity.Z = upaxis * spd; }
             Velocity.X = hsp;
             Velocity.Y = vsp;
 
@@ -187,12 +189,24 @@ namespace blockengine.Entitys
                 invgui.ToggleInventory();
             }
 
+            if (Raylib.IsKeyPressed(KeyboardKey.V))
+            {
+                noclipping = !noclipping;
+            }
+
             if (Raylib.IsKeyPressed(KeyboardKey.F4))
             {
                 Raylib.ToggleFullscreen();
             }
 
-            base.Update(deltatime); // collision checking
+            if (!noclipping)
+            {
+                base.Update(deltatime); // collision checking
+            }
+            else
+            {
+                Position += Velocity * deltatime;
+            }
 
             if ((Velocity.X != 0 || Velocity.Y != 0) && grounded)
             {

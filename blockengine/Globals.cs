@@ -14,17 +14,17 @@ namespace blockengine
     {
         public static Int3 chunk_size = new Int3(16,16,16);
         public static float chunk_fullsize = (chunk_size.x * chunk_size.y) * chunk_size.z;
-        public static int PositionToIndex(Int3 pos)
+        public static int PositionToIndex(Int3 pos, Int3 size)
         {
-            return ((int)pos.z * chunk_size.x * chunk_size.y) + ((int)pos.y * chunk_size.x) + (int)pos.x;
+            return ((int)pos.z * size.x * size.y) + ((int)pos.y * size.x) + (int)pos.x;
         }
 
-        public static Int3 IndexToPosition(int idx)
+        public static Int3 IndexToPosition(int idx, Int3 size)
         {
             int x, y, z;
-            x = idx % chunk_size.x;
-            y = (idx / chunk_size.x) % chunk_size.y;
-            z = idx / (chunk_size.x * chunk_size.y);
+            x = idx % size.x;
+            y = (idx / size.x) % size.y;
+            z = idx / (size.x * size.y);
             return new Int3(x, y, z);
         }
 
@@ -42,6 +42,7 @@ namespace blockengine
             [BlockType.WaterBlock] = new WaterBlock(),
             [BlockType.LavaBlock] = new LavaBlock(),
             [BlockType.ObsidionBlock] = new ObsidionBlock(),
+            [BlockType.StoneBrickBlock] = new StoneBrickBlock(),
             //["WHITE_ORE"] = new BlockDefinition("White Ore", true, false, false, 1, null, new BlockFaces<string>("Assets/Textures/greystone_whiteore.png")),
             [BlockType.ProtoGlassBlock] = new ProtoGlassBlock(),
             [BlockType.MineBlock] = new MineBlock(),//new BlockDefinition(new MineBlock(), "Mine", true, false, true, 1, new BlockModel("Assets/Models/mine.obj", "Assets/Textures/mine.png", Vector3.One * 0.4f, Vector3.Zero, new BlockFaces<bool>(true)))
@@ -50,6 +51,10 @@ namespace blockengine
         };
         public static Dictionary<ItemType, Item> ItemDefinitions = new Dictionary<ItemType, Item>() {
             
+        };
+        public static Dictionary<StructuresType, Structure> StructureDefinitions = new Dictionary<StructuresType, Structure>()
+        {
+            [StructuresType.MiniCastle] = new StructureMiniCastle()
         };
 
         public static Int3[] block_normals = new Int3[6]
@@ -472,5 +477,7 @@ namespace blockengine
         {
             return true;
         }
+
+        
     }
 }
