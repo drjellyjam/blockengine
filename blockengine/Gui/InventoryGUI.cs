@@ -5,104 +5,159 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
 using Raylib_cs;
+using blockengine.Items;
 
 namespace blockengine.Gui
 {
-    public class InventorySpotGUI : GUIPanel
+    public class InventoryPanel : GUIPanel
     {
-        //private Rectangle tex_rect;
-        private Texture2D sprite;
-        public InventorySpotGUI()
+        private Inventory inventory;
+        private List<Vector2> slot_positions;
+        private int slotscale = 64;
+        private float slotpadding = 0.04f;
+        public int selected_slot = -1;
+        private int start_drag_pos = -1;
+        public bool interactable = true;
+
+        private int offset = 0;
+
+        public InventoryPanel(Inventory inv,int _offset = 0)
         {
-            sprite = TextureHandler.GetSprite("Assets/Textures/Sprites/inventory_spot.png");
-            anchor = Vector2.One * 0.5f;
-            size = new Vector2(48f, 48f);
+            offset = _offset;
+            inventory = inv;
+            
+            slot_positions = new List<Vector2>();
+            this.tint = new Color(0.5f, 0.5f, 1f, 0.8f);
         }
-        public override void Draw()
+
+        public void SetLayoutNormal(bool hotbar = false)
         {
-            if (!visible) { return; }
+            
+            
+            int slotcount = inventory.GetSlotCount() - offset;
+            if (hotbar)
+            {
+                this.size = new Vector2(9 * slotscale, ((slotcount / 9) + 0.25f) * slotscale);
+            }
+            else
+            {
+                this.size = new Vector2(9 * slotscale, (slotcount / 9) * slotscale);
+            }
 
-            Vector2 drawpos = GetDrawPos();
+            slot_positions.Clear();
+            for (int i = 0; i < slotcount; i++)
+            {
+                if (i >= slotcount-9 && hotbar)
+                {
+                    slot_positions.Add(
+                        new Vector2(
+                            (i % 9),
+                            (i / 9) + 0.25f
+                        )
+                    );
+                }
+                else
+                {
+                    slot_positions.Add(
+                        new Vector2(
+                            (i % 9),
+                            (i / 9)
+                        )
+                    );
+                }
+            }
+        }
 
-            Raylib.DrawTextureEx(sprite,drawpos,0,2,tint);
-            //Raylib.DrawText("hey", (int)drawpos.X, (int)drawpos.Y, 24, tint);
+        private int GetHoveredSlot()
+        {
+            for (int i = 0; i < slot_positions.Count; i++)
+            {
+                Vector2 slotpos = slot_positions[i];
+                Vector2 drawpos = GetDrawPos();
+                float drawx = drawpos.X + (slotpos.X * slotscale);
+                float drawy = drawpos.Y + (slotpos.Y * slotscale);
+
+                int mx = Raylib.GetMouseX();
+                int my = Raylib.GetMouseY();
+
+                if (mx > drawx && mx < drawx + slotscale && my > drawy && my < drawy + slotscale)
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         public override void Update()
         {
-            if (!visible) { return; }
+            if (!visible || !interactable) { return; }
+
+            selected_slot = -1;
             if (IsMouseOver())
             {
-                tint = new Color(200, 200, 200);
-            }
-            else
-            {
-                tint = Color.White;
-            }
-        }
+                selected_slot = GetHoveredSlot();
 
-    }
-    public class InventoryGUI
-    {
-        private GUIPanel mainpanel;
-        private GUIPanel inventorypanel;
-        public bool inv_showing;
-
-        public InventoryGUI()
-        {
-            mainpanel = new GUIPanel("hotbar",new Vector2(640,720- 64),new Vector2(32,32),new Vector2(0.5f,0.5f),Color.White);
-            inventorypanel = new GUIPanel("inventory");
-            inventorypanel.position.Y = -24f;
-            mainpanel.AddChild(inventorypanel);
-
-            var _w = 9f * 48f;
-            for (int i = 0; i<9; i++)
-            {
-                var _x = (i * 48f) - _w / 2;
-                var invspot = new InventorySpotGUI();
-                invspot.position = new Vector2(_x, 0);
-
-                mainpanel.AddChild(invspot);
-            }
-
-            var _h = 3f * 48f;
-            for (int i = 0; i < 9; i++)
-            {
-                for (int j = 0; j < 3; j++)
+                if (Raylib.IsMouseButtonPressed(MouseButton.Left))
                 {
-                    var _x = (i * 48f) - _w / 2;
-                    var invspot = new InventorySpotGUI();
-                    invspot.position = new Vector2(_x, -_h + (j * 48f));
+                    start_drag_pos = selected_slot;
+                }
 
-                    inventorypanel.AddChild(invspot);
+                if (Raylib.IsMouseButtonReleased(MouseButton.Left))
+                {
+                    inventory.SlotDragged(offset + start_drag_pos, offset + selected_slot);
+                    start_drag_pos = -1;
                 }
             }
 
-            inventorypanel.visible = false;
+            base.Update();
         }
 
-        public void Draw()
+        public override void DrawSelf()
         {
-            mainpanel.Draw();
+            Vector2 drawpos = GetDrawPos();
+            Raylib.DrawRectangleGradientV((int)drawpos.X, (int)drawpos.Y, (int)size.X, (int)size.Y, tint,new Color(tint.R/3, tint.G/3, tint.B/3));
         }
 
-        public void Update()
+        public override void Draw()
         {
-            mainpanel.Update();
-        }
-
-        public void ToggleInventory()
-        {
-            inventorypanel.visible = !inventorypanel.visible;
-            if (inventorypanel.visible)
+            if (visible)
             {
-                Raylib.EnableCursor();
-                inv_showing = true;
-            }
-            else
-            {
-                Raylib.DisableCursor();
-                inv_showing = false;
+                DrawSelf();
+
+                int pad = slotscale/16;
+
+                Vector2 drawpos = GetDrawPos();
+
+
+                for (int i = 0; i < slot_positions.Count; i++)
+                {
+                    InventorySlot slot = inventory.GetSlot(offset+i);
+
+                    Vector2 slotpos = slot_positions[i];
+
+                    float drawx = drawpos.X + (slotpos.X * slotscale);
+                    float drawy = drawpos.Y + (slotpos.Y * slotscale);
+
+                    Raylib.DrawRectangle((int)drawx+ pad, (int)drawy+ pad, slotscale-(pad*2), slotscale-(pad*2), new Color(0f, 0f, 0f, 0.5f));
+
+                    if (slot.count > 0)
+                    {
+                        Item itemdef = Globals.ItemDefinitions[slot.item];
+                        Raylib.DrawTexturePro(TextureHandler.block_atlas.Texture, TextureHandler.GetTextureUV(itemdef.texture).ToRectangle(), new Rectangle(-slotscale/3,-slotscale/3,slotscale/1.5f,slotscale/1.5f), new Vector2(-(drawx + slotscale / 2), -(drawy + slotscale / 2)), 0, Color.White);
+
+                        if (slot.count > 1)
+                        {
+                            Raylib.DrawText(slot.count.ToString(), (int)drawx + pad, (int)drawy + pad, 20, Color.White);
+                        }
+                    }
+
+                    if (i == selected_slot || i == start_drag_pos)
+                    {
+                        Raylib.DrawRectangleLines((int)drawx + pad, (int)drawy + pad, slotscale - (pad * 2), slotscale - (pad * 2), Color.White);
+                    }
+                }
+
+                DrawChildren();
             }
         }
     }

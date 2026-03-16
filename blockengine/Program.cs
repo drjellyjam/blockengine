@@ -1,5 +1,6 @@
 ﻿using blockengine;
 using blockengine.Entitys;
+using blockengine.Items;
 using Raylib_cs;
 using System.Collections;
 using System.Numerics;
@@ -64,14 +65,14 @@ class Program
         }
 
 
-        //Raylib.SetTraceLogLevel(TraceLogLevel.Error);
+        Raylib.SetTraceLogLevel(TraceLogLevel.Error);
         Raylib.InitWindow(1280, 720, "Block Engine");
         Raylib.SetTargetFPS(120);
 
         ModelHandler.LoadModels();
         TextureHandler.CreateAtlasTextures();
 
-        World world = new World(new WorldInfo("test world",Raylib.GetRandomValue(-99999,99999)));
+        World world = new World(new WorldInfo("test world",333)); //Raylib.GetRandomValue(-99999,99999)
         world.ChangeFogColor(Color.Black);
         world.AddEntity(new PlayerEntity(world, "Player", Vector3.Zero),true);
 

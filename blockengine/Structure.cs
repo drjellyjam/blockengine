@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
+using Raylib_cs;
 
 namespace blockengine
 {
@@ -17,7 +18,26 @@ namespace blockengine
 
     public enum StructuresType : int
     {
-        MiniCastle = 0
+        ///SMALL FOLLIAGE
+
+        ///BIG FOLLIAGE
+        BigMushroom,
+        BigTallMushroom,
+        
+        ///SMALL STRUCTURES
+        MiniCastle,
+        ///MEDIUM STRUCTURES
+
+        ///BIG STRUCTURES
+
+        ///BIGGEST SRUCTURES
+        
+
+        Count,
+        /// UNUSED
+        Test,
+
+
     }
 
     public struct BlockRect
@@ -47,11 +67,14 @@ namespace blockengine
         public Int3 anchor_pos;
 
         public StructurePositionType structurePositionType;
-        public int graph_scale;
+        public Int3 graph_scale;
         public int graph_randomness;
         public Int3 graph_offset;
         public StructuresType structureType;
         public int width, height, depth;
+        public bool self_collision = true;
+        public bool other_collision = true;
+        public Color debug_color = Color.Red;
 
         public Structure()
         {
@@ -83,6 +106,11 @@ namespace blockengine
             y = (idx / width) % height;
             z = idx / (width * height);
             return new Int3(x, y, z);
+        }
+
+        public virtual bool CanGenerateInBiome(BiomeType biome)
+        {
+            return true;
         }
 
         public BoxCollider GetBoxCollider(Int3 genpos)
@@ -127,6 +155,209 @@ namespace blockengine
         }
     }
 
+    public class StructureBigMushroom : Structure
+    {
+        public StructureBigMushroom()
+        {
+            width = 5;
+            height = 5;
+            depth = 6;
+
+            anchor_pos = new Int3(2,2,0);
+            structurePositionType = StructurePositionType.OnGround;
+            structureType = StructuresType.BigMushroom;
+
+            graph_scale = new Int3(5, 5, 12);
+            graph_randomness = 4;
+            graph_offset = new Int3(32, 111, 6);
+
+            debug_color = Color.Blue;
+
+            blockmap = new int[(5 * 5) * 6]
+            {
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,1,1,1,1,
+                1,15,15,15,1,
+                1,15,15,15,1,
+                1,15,15,15,1,
+                1,1,1,1,1,
+            };
+        }
+
+        public override bool CanGenerateInBiome(BiomeType biome)
+        {
+            return biome == BiomeType.Mushroom;
+        }
+
+    }
+
+    public class StructureTest : Structure
+    {
+        public StructureTest()
+        {
+            width = 3;
+            height = 3;
+            depth = 3;
+
+            anchor_pos = new Int3(1,1,1);
+            structurePositionType = StructurePositionType.Raw;
+            structureType = StructuresType.Test;
+
+            graph_scale = new Int3(16,16,16);
+            graph_randomness = 4;
+            graph_offset = new Int3(0, 0, 0);
+
+            blockmap = new int[3*3*3]
+            {
+                10,10,10,
+                10,10,10,
+                10,10,10,
+
+                10,10,10,
+                10,10,10,
+                10,10,10,
+
+                10,10,10,
+                10,10,10,
+                10,10,10
+            };
+        }
+
+        public override bool CanGenerateInBiome(BiomeType biome)
+        {
+            return biome == BiomeType.Mushroom;
+        }
+
+    }
+
+    public class StructureBigTallMushroom : Structure
+    {
+        public StructureBigTallMushroom()
+        {
+            width = 5;
+            height = 5;
+            depth = 12;
+
+            anchor_pos = new Int3(2, 2, 0);
+            structurePositionType = StructurePositionType.OnGround;
+            structureType = StructuresType.BigTallMushroom;
+
+            graph_scale = new Int3(5,5, 24);
+            graph_randomness = 4;
+            graph_offset = new Int3(32, 32, 32);
+
+            blockmap = new int[(5 * 5) * 12]
+            {
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,1,1,1,1,
+                1,1,1,1,1,
+                1,1,14,1,1,
+                1,1,1,1,1,
+                1,1,1,1,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,15,15,15,1,
+                15,1,1,1,15,
+                15,1,14,1,15,
+                15,1,1,1,15,
+                1,15,15,15,1,
+
+                1,1,1,1,1,
+                1,15,15,15,1,
+                1,15,15,15,1,
+                1,15,15,15,1,
+                1,1,1,1,1,
+            };
+        }
+
+        public override bool CanGenerateInBiome(BiomeType biome)
+        {
+            return biome == BiomeType.Mushroom;
+        }
+
+    }
+
     public class StructureMiniCastle : Structure
     {
         public StructureMiniCastle()
@@ -135,7 +366,7 @@ namespace blockengine
             structurePositionType = StructurePositionType.OnGround;
             structureType = StructuresType.MiniCastle;
 
-            graph_scale = 16;
+            graph_scale = new Int3(32, 32, 20);
             graph_randomness = 4;
             graph_offset = new Int3(0,0,0);
 
@@ -232,6 +463,11 @@ namespace blockengine
               1,1,1,1,1,1,1,1,
               1,1,1,1,1,1,1,1
             };
+        }
+
+        public override bool CanGenerateInBiome(BiomeType biome)
+        {
+            return biome == BiomeType.Caverns;
         }
     }
 }

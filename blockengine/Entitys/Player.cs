@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 namespace blockengine.Entitys
 {
     /*
+     * ####################################### DEPRECATED ##########################################
+     * 
     public class Player
     {
         public Vector3 Velocity;

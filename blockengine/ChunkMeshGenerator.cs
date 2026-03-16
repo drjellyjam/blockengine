@@ -56,7 +56,7 @@ namespace blockengine
             last_vertcount = vertcount;
             last_vertcountT = vertcountT;
 
-            Console.WriteLine("Clearing mesh data!!");
+            //Console.WriteLine("Clearing mesh data!!");
             verts.Clear();
             normals.Clear();
             uvs.Clear();

@@ -12,6 +12,7 @@ namespace blockengine
     {
         ErrorBlock = 0,
         AirBlock,
+
         GreyStoneBlock,
         BrownStoneBlock,
         MineBlock,
@@ -22,6 +23,12 @@ namespace blockengine
         LavaBlock,
         ObsidionBlock,
         StoneBrickBlock,
+
+        //mushroom biome
+        MushroomGrass,
+        MushroomStone,
+        MushroomLog,
+        MushroomBlock,
 
         BlockCount
     }
@@ -69,6 +76,80 @@ namespace blockengine
         public override BlockType GetBlockType()
         {
             return BlockType.GreyStoneBlock;
+        }
+    }
+
+
+
+    public class MushroomGrassBlock : Block
+    {
+        public MushroomGrassBlock()
+        {
+            FaceTextureIds = new BlockFaces<string>("Assets/Textures/mushroom_grass_top.png", "Assets/Textures/mushroom_stone.png", "Assets/Textures/mushroom_grass.png");
+        }
+
+        public override string GetDisplayName()
+        {
+            return "Mushroom Grass";
+        }
+
+        public override BlockType GetBlockType()
+        {
+            return BlockType.MushroomGrass;
+        }
+    }
+
+    public class MushroomLogBlock : Block
+    {
+        public MushroomLogBlock()
+        {
+            FaceTextureIds = new BlockFaces<string>("Assets/Textures/mushroom_log_top.png", "Assets/Textures/mushroom_log_top.png", "Assets/Textures/mushroom_log.png");
+        }
+
+        public override string GetDisplayName()
+        {
+            return "Mushroom Log";
+        }
+
+        public override BlockType GetBlockType()
+        {
+            return BlockType.MushroomLog;
+        }
+    }
+
+    public class MushroomBlock : Block
+    {
+        public MushroomBlock()
+        {
+            FaceTextureIds = new BlockFaces<string>("Assets/Textures/mushroom_block.png");
+        }
+
+        public override string GetDisplayName()
+        {
+            return "Mushroom";
+        }
+
+        public override BlockType GetBlockType()
+        {
+            return BlockType.MushroomBlock;
+        }
+    }
+
+    public class MushroomStoneBlock : Block
+    {
+        public MushroomStoneBlock()
+        {
+            FaceTextureIds = new BlockFaces<string>("Assets/Textures/mushroom_stone.png");
+        }
+
+        public override string GetDisplayName()
+        {
+            return "Mushroom Stone";
+        }
+
+        public override BlockType GetBlockType()
+        {
+            return BlockType.MushroomStone;
         }
     }
 

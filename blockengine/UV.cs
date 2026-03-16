@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Raylib_cs;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,6 +18,11 @@ namespace blockengine
             YMIN = ymin;
             XMAX = xmax;
             YMAX = ymax;
+        }
+
+        public Rectangle ToRectangle()
+        {
+            return new Rectangle(XMIN * 512, YMIN * 512, (XMAX - XMIN) * 512, (YMAX - YMIN) * 512);
         }
 
         public float[] ToVector4()

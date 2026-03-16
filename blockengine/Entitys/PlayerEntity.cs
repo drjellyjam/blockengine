@@ -9,22 +9,24 @@ using Raylib_cs;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using blockengine.Gui;
+using blockengine.Items;
 
 namespace blockengine.Entitys
 {
     public class PlayerEntity : LivingEntity
     {
+        public Camera3D cam;
+        public Inventory inventory;
+
         private float camlookyaw = 0;
         private float camlookpitch = 0;
         private float last_camlookyaw = 0;
         private float last_camlookpitch = 0;
         private Vector2 camdelta;
-        public Camera3D cam;
 
         private float gravity = 0.25f;
         private float mousesensitivity = 30f;
         private float spd = 4f;
-        private BlockType block_to_place = BlockType.BrownStoneBlock;
         private Mesh? handmesh = null;
 
         private bool focused_on_block = false;
@@ -37,7 +39,17 @@ namespace blockengine.Entitys
         private BlockFaces<string>[] crack_anim;
         private float hit_anim = 0;
         private float bob_anim = 0;
-        private InventoryGUI invgui;
+
+        private GUIPanel GUIroot;
+        private InventoryPanel invpanel;
+        private InventoryPanel hotbarpanel;
+        private bool mouse_locked = true;
+
+        private int selected_hotbar = 0;
+        private int selected_slot = -1;
+        private bool holding_something = false;
+        private ItemType holding_itemtype = 0;
+
         private bool noclipping = false;
         //private RenderTexture2D viewmodel_rendertexture;
         public PlayerEntity(World _world, string _Name, Vector3 _position) : base(_world, _Name, _position)
@@ -57,8 +69,25 @@ namespace blockengine.Entitys
             var collider_height = 1.5f;
             SetCollider(Vector3.Zero, new Vector3(-collider_width / 2, -collider_width / 2, -collider_height / 2), new Vector3(collider_width / 2, collider_width / 2, collider_height / 2));
 
+            inventory = new Inventory(9 * 4);
+            GUIroot = new GUIPanel("root", new Vector2(0, 0), new Vector2(Raylib.GetRenderWidth(), Raylib.GetRenderHeight()),new Vector2(0,0),new Color(0,0,0,0));
+            invpanel = new InventoryPanel(inventory);
+            invpanel.SetLayoutNormal(true);
+            invpanel.position = new Vector2(Raylib.GetRenderWidth() / 2, Raylib.GetRenderHeight() / 2);
+            invpanel.anchor = new Vector2(0.5f, 0.5f);
+            invpanel.visible = false;
 
-            invgui = new InventoryGUI();
+            hotbarpanel = new InventoryPanel(inventory, 9*3);
+            hotbarpanel.SetLayoutNormal();
+            hotbarpanel.position = new Vector2(Raylib.GetRenderWidth() / 2, Raylib.GetRenderHeight());
+            hotbarpanel.anchor = new Vector2(0.5f, 1f);
+            hotbarpanel.visible = true;
+            hotbarpanel.interactable = false;
+
+            GUIroot.AddChild(invpanel);
+            GUIroot.AddChild(hotbarpanel);
+
+            SelectHotbar(0);
         }
 
         public override void Start()
@@ -72,6 +101,21 @@ namespace blockengine.Entitys
         {
             Position += new Vector3(Raylib.GetRandomValue(-1, 1), Raylib.GetRandomValue(-1, 1), Raylib.GetRandomValue(-1, 1));
         }
+
+        private void SelectHotbar(int newselected)
+        {
+            int select = Globals.better_modI(newselected, 9);
+
+            selected_hotbar = select;
+            selected_slot = (inventory.GetSlotCount() - 9) + selected_hotbar;
+
+            InventorySlot slot = inventory.GetSlot(selected_slot);
+            holding_something = !slot.IsEmpty();
+            holding_itemtype = slot.item;
+
+            hotbarpanel.selected_slot = selected_hotbar;
+        }
+
         private void setblocklookingat()
         {
             last_raycast = world.Raycast(world.cam.Position, GetCameraForward() * 8);
@@ -107,12 +151,19 @@ namespace blockengine.Entitys
             float rightaxis = (Raylib.IsKeyDown(KeyboardKey.A) - Raylib.IsKeyDown(KeyboardKey.D));
             float upaxis = (Raylib.IsKeyDown(KeyboardKey.Space) - Raylib.IsKeyDown(KeyboardKey.LeftShift));
 
-            float hsp = camforward.X * forwardaxis * spd;
-            float vsp = camforward.Y * forwardaxis * spd;
-            hsp += camright.X * rightaxis * spd;
-            vsp += camright.Y * rightaxis * spd;
+            var vspd = spd;
 
-            if (!noclipping) { Velocity.Z -= gravity; } else { Velocity.Z = upaxis * spd; }
+            if (noclipping)
+            {
+                vspd *= 8;
+            }
+
+            float hsp = camforward.X * forwardaxis * vspd;
+            float vsp = camforward.Y * forwardaxis * vspd;
+            hsp += camright.X * rightaxis * vspd;
+            vsp += camright.Y * rightaxis * vspd;
+
+            if (!noclipping) { Velocity.Z -= gravity; } else { Velocity.Z = upaxis * vspd; }
             Velocity.X = hsp;
             Velocity.Y = vsp;
 
@@ -123,32 +174,12 @@ namespace blockengine.Entitys
                 Velocity.Z = 12f;
             }
 
-            int scroll = (int)Raylib.GetMouseWheelMove();
-            if (scroll != 0)
-            {
-                scroll = Math.Sign(scroll);
-
-                block_to_place += scroll;
-                if (block_to_place >= BlockType.BlockCount)
-                {
-                    block_to_place = 0;
-                }
-                if (block_to_place < 0)
-                {
-                    block_to_place = BlockType.BlockCount - 1;
-                }
-
-                var blockdef = Globals.BlockDefinitions[block_to_place];
-
-                scroll = 0;
-            }
-
             if (Raylib.IsKeyPressed(KeyboardKey.R))
             {
                 unstuck();
             }
 
-            if (Raylib.IsMouseButtonDown(MouseButton.Left) && !invgui.inv_showing)
+            if (Raylib.IsMouseButtonDown(MouseButton.Left) && mouse_locked)
             {
                 if (focused_on_block)
                 {
@@ -172,26 +203,41 @@ namespace blockengine.Entitys
                 hit_anim = 0;
             }
 
-            if (Raylib.IsMouseButtonPressed(MouseButton.Right) && !invgui.inv_showing)
+            if (Raylib.IsMouseButtonPressed(MouseButton.Right) && mouse_locked)
             {
-                if (focused_on_block && last_raycast != null)
+                if (holding_something)
                 {
-                    BoxCollider blockcollider = world.GetBlockCollider(focused_block_pos + last_raycast.Normal);
-                    if (!blockcollider.CollidingWith(collider))
-                    {
-                        world.PlaceBlock(focused_block_pos + last_raycast.Normal, block_to_place);
-                    }
+                    InventorySlot slot = inventory.GetSlot(selected_slot);
+                    Item item = Globals.ItemDefinitions[slot.item];
+
+                    item.OnRightClicked(this, slot, inventory, world);
                 }
             }
 
             if (Raylib.IsKeyPressed(KeyboardKey.E))
             {
-                invgui.ToggleInventory();
+                invpanel.visible = !invpanel.visible;
+                hotbarpanel.visible = !invpanel.visible;
+                mouse_locked = !invpanel.visible;
+
+                if (invpanel.visible)
+                {
+                    Raylib.EnableCursor();
+                }
+                else
+                {
+                    Raylib.DisableCursor();
+                }
             }
 
             if (Raylib.IsKeyPressed(KeyboardKey.V))
             {
                 noclipping = !noclipping;
+            }
+
+            if (Raylib.IsKeyPressed(KeyboardKey.F))
+            {
+                inventory.AddItem((ItemType)Raylib.GetRandomValue(0, (int)ItemType.Count-1), 1);
             }
 
             if (Raylib.IsKeyPressed(KeyboardKey.F4))
@@ -218,7 +264,54 @@ namespace blockengine.Entitys
                 bob_anim = 0;
             }
 
-            //invgui.Update();
+            //GUI
+
+            GUIroot.Update();
+
+            int scroll = (int)Raylib.GetMouseWheelMove();
+            if (scroll != 0)
+            {
+                scroll = Math.Sign(scroll);
+
+                SelectHotbar(selected_hotbar + scroll);
+            }
+
+            if (Raylib.IsKeyPressed(KeyboardKey.One))
+            {
+                SelectHotbar(0);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Two))
+            {
+                SelectHotbar(1);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Three))
+            {
+                SelectHotbar(2);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Four))
+            {
+                SelectHotbar(3);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Five))
+            {
+                SelectHotbar(4);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Six))
+            {
+                SelectHotbar(5);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Seven))
+            {
+                SelectHotbar(6);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Eight))
+            {
+                SelectHotbar(7);
+            }
+            if (Raylib.IsKeyPressed(KeyboardKey.Nine))
+            {
+                SelectHotbar(8);
+            }
         }
         public override void Draw()
         {
@@ -240,17 +333,28 @@ namespace blockengine.Entitys
 
             //camlookpitch * 0.0174533f
 
-            Matrix4x4 mat = MatrixRotateX(MathF.Sin(hit_anim)*0.3f);
-            mat = MatrixMultiply(mat, MatrixTranslate(3.5f,3.5f, -2f + (MathF.Abs(MathF.Sin(bob_anim)) * 0.25f) ));
-            mat = MatrixMultiply(mat, MatrixMultiply(MatrixRotateXYZ(new Vector3((camlookpitch + camdelta.X) * 0.0174533f, 0, 0)), MatrixRotateXYZ(new Vector3(0, 0, (camlookyaw + camdelta.Y) * 0.0174533f))));
-            mat = MatrixMultiply(mat, MatrixScale(0.05f, 0.05f, 0.05f));
-            mat = MatrixMultiply(mat, MatrixTranslate(world.cam.Position.X, world.cam.Position.Y, world.cam.Position.Z));
+            if (holding_something)
+            {
+                Matrix4x4 mat = MatrixRotateX(MathF.Sin(hit_anim) * 0.3f);
+                mat = MatrixMultiply(mat, MatrixTranslate(3.5f, 3.5f, -2f + (MathF.Abs(MathF.Sin(bob_anim)) * 0.25f)));
+                mat = MatrixMultiply(mat, MatrixMultiply(MatrixRotateXYZ(new Vector3((camlookpitch + camdelta.X) * 0.0174533f, 0, 0)), MatrixRotateXYZ(new Vector3(0, 0, (camlookyaw + camdelta.Y) * 0.0174533f))));
+                mat = MatrixMultiply(mat, MatrixScale(0.05f, 0.05f, 0.05f));
+                mat = MatrixMultiply(mat, MatrixTranslate(world.cam.Position.X, world.cam.Position.Y, world.cam.Position.Z));
 
-            ModelHandler.DrawBlockType(block_to_place, mat);
+                ModelHandler.DrawItem(holding_itemtype, mat);
+            }
         }
 
         public override void DrawGui()
         {
+            Raylib.DrawText((int)Position.X + ", " + (int)Position.Y + ", " + (int)Position.Z, 32, 256, 24, Color.White);
+
+            GUIroot.Draw();
+
+            //Item itemdef = Globals.ItemDefinitions[ItemType.TestPickaxe];
+
+            //Raylib.DrawTexturePro(TextureHandler.block_atlas.Texture, TextureHandler.GetTextureUV(itemdef.texture).ToRectangle(), new Rectangle(0, 0, 64, 64), new Vector2(0,0), 15, Color.White);
+            
             //invgui.Draw();
             //Raylib.DrawTexture(viewmodel_rendertexture.Texture, 0, 0, Color.White);
         }
@@ -294,9 +398,21 @@ namespace blockengine.Entitys
             );
         }
 
+        public void PlaceBlock(BlockType block_to_place)
+        {
+            if (focused_on_block && last_raycast != null)
+            {
+                BoxCollider blockcollider = world.GetBlockCollider(focused_block_pos + last_raycast.Normal);
+                if (!blockcollider.CollidingWith(collider))
+                {
+                    world.PlaceBlock(focused_block_pos + last_raycast.Normal, block_to_place);
+                }
+            }
+        }
+
         private void UpdateCamera(float deltatime)
         {
-            if (!invgui.inv_showing)
+            if (mouse_locked)
             {
                 Vector2 mousedelta = Raylib.GetMouseDelta();
 
@@ -315,6 +431,7 @@ namespace blockengine.Entitys
                     camlookpitch = 89;
                 } 
             }
+
             camdelta.X = Raymath.Lerp(camdelta.X, (camlookpitch - last_camlookpitch) * 0.5f, 5 * deltatime);
             camdelta.Y = Raymath.Lerp(camdelta.Y, (camlookyaw - last_camlookyaw) * 0.5f, 5 * deltatime);
 

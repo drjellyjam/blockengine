@@ -133,14 +133,28 @@ namespace blockengine.Gui
             return drawpos;
         }
 
-        public virtual void Draw()
+        public virtual void DrawSelf()
         {
-            if (!visible) { return; }
+            Vector2 drawpos = GetDrawPos();
+            Raylib.DrawRectangle((int)drawpos.X, (int)drawpos.Y, (int)size.X, (int)size.Y, tint);
+        }
+
+        public void DrawChildren()
+        {
             for (int i = 0; i < children.Count; i++)
             {
                 var child = children[i];
                 child.Draw();
             }
+        }
+
+        public virtual void Draw()
+        {
+            if (!visible) { return; }
+
+            DrawSelf();
+
+            DrawChildren();
         }
     }
 }

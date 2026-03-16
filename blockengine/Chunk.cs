@@ -56,6 +56,7 @@ namespace blockengine
         public bool needs_rebuilt;
         public bool first_built;
         public ChunkGenerationStage generation_stage = ChunkGenerationStage.NotGenerated;
+        public BiomeType biome;
         public Chunk(Int3 chunkpos)
         {
             needs_rebuilt = false;
@@ -64,7 +65,7 @@ namespace blockengine
             this.chunkpos = chunkpos;
             transform = Matrix4x4.Transpose(Matrix4x4.CreateTranslation((chunkpos * Globals.chunk_size).to_vector3()) * Matrix4x4.CreateScale(Globals.BlockScale));
             map = new Map3D(Globals.chunk_size.x, Globals.chunk_size.y, Globals.chunk_size.z, BlockType.GreyStoneBlock);
-            
+            biome = BiomeType.Caverns;
             generator = new ChunkMeshGenerator();
         }
         public int UploadMeshes()
