@@ -1,17 +1,20 @@
-# blockengine
+# blockengine (WIP)
+My C# Raylib based minecraft like.
 
-My C# Raylib based voxel engine
+Fork this project if you want! I wont help you understand the code but it is a working voxel engine!
 
 features:
 
-. Infinite chunks
+. Infinite cubic chunks
 
-. multiple blocks (system needs revamp)
+. multiple blocks
 
-. runtime texture atlas generation from seperate texture files (bad)
+. runtime texture atlas generation from seperate texture files (ok)
 
 . block collision checking
 
-. block raycasting (slightly broken in coordinates less than 0)
+. block raycasting
 
 . Multi Threading
+
+. Basic Structures
